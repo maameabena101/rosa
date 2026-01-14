@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rosa | Digital Trust Circles</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        
+        html, body { height: 100%; } /* NEW: helps full-height layouts */
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #F8FAFC;
+        }
+
+        .rosa-gradient { background: linear-gradient(135deg, #4f46e5 0%, #9333ea 100%); }
+        .rosa-text-gradient {
+            background: linear-gradient(135deg, #4f46e5 0%, #9333ea 100%);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .view-section { display: none; }
+        .view-section.active { display: block; }
+
+        .status-pill { font-size: 10px; font-weight: 800; padding: 4px 10px; border-radius: 999px; text-transform: uppercase; }
+        .status-paid { background: #dcfce7; color: #166534; }
+        .status-pending { background: #fef9c3; color: #854d0e; }
+        .status-missed { background: #fee2e2; color: #991b1b; }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        
+        @keyframes slideUp { from { transform: translateY(15px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .animate-slide-up { animation: slideUp 0.3s ease-out; }
+
+        /* Modal specific animation */
+        .modal-backdrop { background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(4px); }
+    </style>
+</head>
+<body class="text-slate-900 min-h-screen"> <!-- NEW: min-h-screen -->
+
+    <div id="toast-container" class="fixed top-6 right-6 z-[100] flex flex-col gap-3"></div>
+
+    <!-- Vote Modal -->
+    <div id="vote-modal" class="fixed inset-0 z-[110] modal-backdrop items-center justify-center hidden">
+        <div class="bg-white w-full max-w-md mx-6 p-8 rounded-[2.5rem] shadow-2xl animate-slide-up">
+            <h3 class="text-2xl font-black mb-2">Propose a Vote</h3>
+            <p class="text-slate-400 text-sm font-medium mb-6">What would you like the circle to decide on?</p>
+            
+            <textarea id="vote-topic-input" rows="3" placeholder="e.g. Increase monthly contribution to $400 for the next cycle?" class="w-full px-5 py-4 bg-slate-50 rounded-2xl border-2 border-transparent focus:border-indigo-500 outline-none transition-all font-bold text-sm resize-none mb-6"></textarea>
+            
+            <div class="flex gap-3">
+                <button onclick="closeVoteModal()" class="flex-1 py-4 bg-slate-100 text-slate-500 rounded-xl font-black text-xs">Cancel</button>
+                <button onclick="submitVoteProposal()" class="flex-1 py-4 rosa-gradient text-white rounded-xl font-black text-xs shadow-lg shadow-indigo-100">Post to Chat</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Nav -->
+    <nav class="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b border-slate-200/60 px-6 py-4">
+        <!-- UPDATED: max-w-7xl mx-auto -> w-full so it stretches across laptop width -->
+        <div class="w-full flex justify-between items-center">
+            <div class="flex items-center gap-2 cursor-pointer" onclick="showView('landing')">
+                <div class="rosa-gradient text-white w-9 h-9 rounded-xl flex items-center justify-center font-black shadow-lg">R</div>
+                <!-- UPDATED: Rsa -> Rosa -->
+                <span class="text-xl font-black tracking-tighter rosa-text-gradient">Rosa</span>
+            </div>
+            <div class="flex items-center gap-6">
+                <button onclick="showView('dashboard')" class="text-sm font-bold text-slate-500 hover:text-indigo-600 transition-colors">Explorer</button>
+                <div class="flex items-center gap-3 border-l pl-6 border-slate-200">
+                    <div class="text-right">
+                        <p class="text-[8px] font-black text-slate-400 uppercase leading-none">Your Trust</p>
+                        <p id="global-trust" class="text-xs font-black text-emerald-500">100</p>
+                    </div>
+                    <div class="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center font-bold text-xs text-slate-500">A</div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- LANDING -->
+    <section id="view-landing" class="view-section active animate-slide-up">
+        <!-- UPDATED: max-w-7xl mx-auto -> w-full to use full laptop width -->
+        <div class="w-full px-6 py-20 lg:py-32">
+            <div class="max-w-3xl">
+                <h1 class="text-6xl lg:text-8xl font-black tracking-tighter leading-[0.9] mb-8">
+                    Trust-first <br><span class="rosa-text-gradient">group savings.</span>
+                </h1>
+                <p class="text-xl text-slate-500 font-medium mb-12 leading-relaxed">
+                    A Rotating Savings and Credit Association is the world’s most successful informal banking system. Known as Tanda in Mexico, Chama in Kenya, Susu in West Africa, and Hui in Asia. It's simple: A group of people contributes a fixed amount every month. Each month, one member takes the entire collection (the "Pot"). By the end of the cycle, everyone has saved a significant sum, interest-free.
+                </p>
+                <div class="flex flex-wrap gap-4">
+                    <button onclick="showView('create')" class="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black shadow-xl shadow-indigo-100">Create Custom Group</button>
+                    <button onclick="showView('dashboard')" class="bg-white border border-slate-200 px-8 py-4 rounded-2xl font-black">Browse 20+ Live Circles</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- DASHBOARD (Explorer) -->
+    <!-- UPDATED: max-w-7xl mx-auto -> w-full -->
+    <section id="view-dashboard" class="view-section w-full px-6 py-12 animate-slide-up">
+        <div class="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4">
+            <div>
+                <h2 class="text-3xl font-black tracking-tight">Marketplace</h2>
+                <div class="flex bg-slate-100 p-1 rounded-lg mt-4 w-fit">
+                    <button id="tab-explore" onclick="toggleTabs('explore')" class="px-6 py-2 rounded-md text-xs font-black transition-all bg-white shadow-sm text-indigo-600">Public Market</button>
+                    <button id="tab-joined" onclick="toggleTabs('joined')" class="px-6 py-2 rounded-md text-xs font-black transition-all text-slate-500">My Memberships</button>
+                </div>
+            </div>
+            <button onclick="showView('create')" class="bg-slate-900 text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-indigo-600 transition-all">+ Start Your Circle</button>
+        </div>
+        <div id="groups-grid" class="grid md:grid-cols-2 lg:grid-cols-3 gap-8"></div>
+    </section>
+
+    <!-- CREATE -->
+    <!-- UPDATED: max-w-2xl -> max-w-5xl for better laptop fit (still centered & clean) -->
+    <section id="view-create" class="view-section max-w-5xl mx-auto px-6 py-16 animate-slide-up">
+        <div class="bg-white p-10 md:p-14 rounded-[3rem] shadow-2xl border border-slate-100">
+            <button onclick="showView('dashboard')" class="text-[10px] font-black text-slate-400 hover:text-indigo-600 uppercase mb-6 flex items-center gap-2"><i class="fas fa-arrow-left"></i> Back to Dashboard</button>
+            <h2 class="text-3xl font-black mb-2">Build Your Circle</h2>
+            <p class="text-slate-400 font-medium mb-10">Define your own amount and member limits.</p>
+            
+            <form id="create-group-form" class="space-y-6">
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Group Title</label>
+                    <input type="text" id="g-name" required placeholder="e.g. Makola Market Savings" class="w-full mt-2 px-6 py-4 bg-slate-50 rounded-2xl border-2 border-transparent focus:border-indigo-500 outline-none transition-all font-bold">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Monthly Amount ($)</label>
+                        <input type="number" id="g-amount" required placeholder="100" class="w-full mt-2 px-6 py-4 bg-slate-50 rounded-2xl outline-none font-bold">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Member Count</label>
+                        <input type="number" id="g-count" required placeholder="6" class="w-full mt-2 px-6 py-4 bg-slate-50 rounded-2xl outline-none font-bold">
+                    </div>
+                </div>
+                <div class="p-6 bg-indigo-50 rounded-2xl border border-indigo-100">
+                    <p id="pot-calc" class="text-2xl font-black text-indigo-900">$0.00 / Month Pot</p>
+                    <p class="text-[10px] text-indigo-500 mt-2">The first month acts as a Security Reserve.</p>
+                </div>
+                <button type="submit" class="w-full rosa-gradient text-white py-5 rounded-2xl font-black text-lg shadow-xl">Launch Circle</button>
+            </form>
+        </div>
+    </section>
+
+    <!-- DETAIL -->
+    <!-- UPDATED: max-w-7xl mx-auto -> w-full -->
+    <section id="view-detail" class="view-section w-full px-6 py-12 animate-slide-up">
+        <div class="mb-8">
+            <button onclick="showView('dashboard')" class="text-[10px] font-black text-slate-400 hover:text-indigo-600 uppercase flex items-center gap-2"><i class="fas fa-arrow-left"></i> Exit to Dashboard</button>
+        </div>
+        <div id="detail-content"></div>
+    </section>
+
+    <script>
+        // --- DATA ---
+        let user = { id: 'u-1', name: 'Ama (You)', trust: 100 };
+        
+        const publicGroupTitles = [
+            "Kumasi Traders", "Lagos Techies", "Nairobi Creatives", "Cape Town Surfers", "Accra Foodies",
+            "Abidjan Fashionistas", "Johannesburg Miners", "Kigali Founders", "Dakar Artists", "Cairo Engineers",
+            "Casablanca Bakers", "Luanda Logistics", "Harare Teachers", "Lusaka Farmers", "Banjul Tourism",
+            "Maputo Media", "Windhoek Real Estate", "Gaborone Diamonds", "Kampala Transporters", "Dar Es Salaam Port"
+        ];
+
+        let publicGroups = publicGroupTitles.map((title, i) => ({
+            id: `pg-${i}`,
+            name: title,
+            amount: 50 + (i * 25),
+            max: 5 + (i % 3),
+            leaderId: `u-p-${i}`,
+            status: 'Recruiting',
+            joined: false,
+            payoutOrder: Array.from({length: 5 + (i % 3)}, (_, j) => `u-m-${i}-${j}`),
+            members: [
+                { id: `u-p-${i}`, name: 'Leader', trust: 95, role: 'Leader' },
+                { id: `u-m-${i}-1`, name: 'Member 1', trust: 100, role: 'Member' }
+            ],
+            contributions: {},
+            chat: [{ id: 'sys-' + i, sender: 'System', text: 'Group looking for trusted savers.', type: 'sys' }],
+            votes: [], requests: []
+        }));
+
+        let myGroups = [
+            {
+                id: 'g-1', name: 'Tech Savvy Circle', amount: 300, max: 6,
+                leaderId: 'u-2', status: 'Cycle: Month 5/6', joined: true,
+                payoutOrder: ['u-2', 'u-3', 'u-4', 'u-5', 'u-1', 'u-6'],
+                members: [
+                    { id: 'u-2', name: 'Kwame', trust: 98, role: 'Leader' },
+                    { id: 'u-1', name: 'Ama (You)', trust: 100, role: 'Member' },
+                    { id: 'u-3', name: 'Kojo', trust: 99, role: 'Member' },
+                    { id: 'u-4', name: 'Abena', trust: 95, role: 'Member' },
+                    { id: 'u-5', name: 'Yao', trust: 97, role: 'Member' },
+                    { id: 'u-6', name: 'Esi', trust: 94, role: 'Member' }
+                ],
+                contributions: { 'u-1-m5': 'paid', 'u-2-m5': 'paid', 'u-3-m5': 'paid', 'u-4-m5': 'paid' },
+                chat: [
+                    { id: 'sys-g1-1', sender: 'System', text: 'Scenario: 5 months in. You are next to be paid.', type: 'sys' },
+                    { id: 'msg-g1-1', sender: 'Kwame', text: 'Should we increase the pot for next cycle?', type: 'msg' },
+                    { id: 'v-1', type: 'vote', topic: 'Increase pot to $400 next cycle?', yes: ['u-2', 'u-3'], no: [], total: 6 }
+                ],
+                votes: [], requests: []
+            },
+            {
+                id: 'g-2', name: 'New Family Susu', amount: 150, max: 4,
+                leaderId: 'u-1', status: 'Reserve Month (New)', joined: true,
+                payoutOrder: ['u-1', 'u-8', 'u-9', 'u-10'],
+                members: [
+                    { id: 'u-1', name: 'Ama (You)', trust: 100, role: 'Leader' },
+                    { id: 'u-8', name: 'Fatou', trust: 100, role: 'Member' },
+                    { id: 'u-9', name: 'Samba', trust: 98, role: 'Member' },
+                    { id: 'u-10', name: 'Aisha', trust: 99, role: 'Member' }
+                ],
+                contributions: { 'u-1-m1': 'pending' },
+                chat: [{ id: 'sys-g2-1', sender: 'System', text: 'Scenario: Just started. Paying Security Reserve.', type: 'sys' }],
+                votes: [], requests: []
+            },
+            {
+                id: 'g-3', name: 'Venture Savers', amount: 500, max: 5,
+                leaderId: 'u-11', status: 'Issue: Default Alert', joined: true,
+                payoutOrder: ['u-11', 'u-12', 'u-13', 'u-1', 'u-15'],
+                members: [
+                    { id: 'u-11', name: 'John', trust: 100, role: 'Leader' },
+                    { id: 'u-12', name: 'Sarah', trust: 45, role: 'Member' },
+                    { id: 'u-13', name: 'Dave', trust: 99, role: 'Member' },
+                    { id: 'u-1', name: 'Ama (You)', trust: 100, role: 'Member' },
+                    { id: 'u-15', name: 'Boky', trust: 100, role: 'Member' }
+                ],
+                contributions: { 'u-12-m3': 'missed' },
+                chat: [
+                    { id: 'sys-g3-1', sender: 'System', text: 'Scenario: Default! Sarah missed payment. Escalation required.', type: 'sys' },
+                    { id: 'v-99', type: 'vote', topic: 'Should we pause Sarah and redistribute?', yes: ['u-11'], no: ['u-13'], total: 5 }
+                ],
+                votes: [], requests: []
+            },
+            {
+                id: 'g-ama-lead', name: 'Ama\'s Managed Circle', amount: 200, max: 8,
+                leaderId: 'u-1', status: 'Ama is Leader', joined: true,
+                payoutOrder: ['u-1', 'u-lead-2', 'u-lead-3', 'u-lead-4', 'u-lead-5'],
+                members: [
+                    { id: 'u-1', name: 'Ama (You)', trust: 100, role: 'Leader' },
+                    { id: 'u-lead-2', name: 'Peter', trust: 99, role: 'Member' },
+                    { id: 'u-lead-3', name: 'Grace', trust: 98, role: 'Member' }
+                ],
+                contributions: {},
+                chat: [{ id: 'sys-lead-1', sender: 'System', text: 'Scenario: You are the Leader. Manage your members below.', type: 'sys' }],
+                votes: [], 
+                requests: [
+                    { id: 'u-req-1', name: 'Bismark', trust: 88 },
+                    { id: 'u-req-2', name: 'Esther', trust: 96 }
+                ]
+            }
+        ];
+
+        let groups = [...myGroups, ...publicGroups];
+        let activeTab = 'explore';
+        let currentGroupId = null;
+
+        // --- NAVIGATION ---
+        function showView(id) {
+            document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
+            document.getElementById(`view-${id}`).classList.add('active');
+            if (id === 'dashboard') renderGroups();
+            window.scrollTo(0,0);
+        }
+
+        function toggleTabs(tab) {
+            activeTab = tab;
+            const exp = document.getElementById('tab-explore');
+            const joi = document.getElementById('tab-joined');
+            if (tab === 'explore') {
+                exp.className = "px-6 py-2 rounded-md text-xs font-black transition-all bg-white shadow-sm text-indigo-600";
+                joi.className = "px-6 py-2 rounded-md text-xs font-black transition-all text-slate-500";
+            } else {
+                joi.className = "px-6 py-2 rounded-md text-xs font-black transition-all bg-white shadow-sm text-indigo-600";
+                exp.className = "px-6 py-2 rounded-md text-xs font-black transition-all text-slate-500";
+            }
+            renderGroups();
+        }
+
+        // --- RENDERERS ---
+        function renderGroups() {
+            const grid = document.getElementById('groups-grid');
+            const filtered = groups.filter(g => activeTab === 'joined' ? g.joined : !g.joined);
+            
+            grid.innerHTML = filtered.map(g => `
+                <div class="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all">
+                    <div class="flex justify-between items-start mb-6">
+                        <div class="w-10 h-10 rosa-gradient text-white rounded-xl flex items-center justify-center text-sm font-bold shadow-md">
+                            <i class="fas ${g.status.includes('Issue') ? 'fa-exclamation-triangle text-amber-300' : (g.leaderId === user.id ? 'fa-crown text-amber-300' : 'fa-rotate')}"></i>
+                        </div>
+                        <span class="text-[9px] font-black px-2 py-1 ${g.status.includes('Issue') ? 'bg-red-50 text-red-500' : 'bg-slate-100 text-slate-500'} rounded-full uppercase">${g.status}</span>
+                    </div>
+                    <h3 class="text-xl font-black mb-1">${g.name}</h3>
+                    <p class="text-xs text-slate-400 font-bold mb-6">$${g.amount}/mo • $${g.amount * g.max} Pot</p>
+                    
+                    <div class="flex items-center justify-between mb-8">
+                        <div class="flex -space-x-2">
+                            ${g.members.slice(0, 4).map(m => `<div class="w-7 h-7 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[9px] font-bold text-slate-400">${m.name[0]}</div>`).join('')}
+                            ${g.members.length > 4 ? `<div class="w-7 h-7 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center text-[8px] font-bold">+${g.members.length - 4}</div>` : ''}
+                        </div>
+                        <span class="text-[9px] font-black text-slate-400 uppercase tracking-tighter">${g.members.length}/${g.max} Members</span>
+                    </div>
+
+                    <button onclick="${g.joined ? `openGroup('${g.id}')` : `requestJoin('${g.id}')`}" class="w-full py-4 ${g.joined ? (g.leaderId === user.id ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-white') : 'border-2 border-indigo-50 text-indigo-600'} rounded-xl font-black text-xs hover:scale-[1.02] transition-all">
+                        ${g.joined ? (g.leaderId === user.id ? 'Manage as Leader' : 'Enter Dashboard') : 'Request to Join'}
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function openGroup(id) {
+            currentGroupId = id;
+            const g = groups.find(x => x.id === id);
+            const isLeader = g.leaderId === user.id;
+            const container = document.getElementById('detail-content');
+            
+            container.innerHTML = `
+                <div class="grid lg:grid-cols-12 gap-8">
+                    <!-- Left: Ledger & Payout -->
+                    <div class="lg:col-span-8 space-y-8">
+                        <!-- Request Banner if Leader -->
+                        ${isLeader && g.requests.length > 0 ? `
+                        <div class="bg-indigo-600 p-8 rounded-[2.5rem] text-white shadow-xl shadow-indigo-100 mb-8 animate-slide-up">
+                            <h4 class="text-lg font-black mb-4 flex items-center gap-2"><i class="fas fa-user-plus"></i> Pending Join Requests</h4>
+                            <div class="grid md:grid-cols-2 gap-4">
+                                ${g.requests.map(req => `
+                                    <div id="req-${req.id}" class="bg-white/10 p-4 rounded-2xl flex items-center justify-between">
+                                        <div>
+                                            <p class="font-bold text-sm">${req.name}</p>
+                                            <p class="text-[10px] font-black text-emerald-300">Trust: ${req.trust}</p>
+                                        </div>
+                                        <div class="flex gap-2">
+                                            <button onclick="handleRequest('${g.id}', '${req.id}', true)" class="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center"><i class="fas fa-check text-[10px]"></i></button>
+                                            <button onclick="handleRequest('${g.id}', '${req.id}', false)" class="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center"><i class="fas fa-times text-[10px]"></i></button>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                        ` : ''}
+
+                        <div class="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm">
+                            <div class="flex flex-wrap items-start justify-between gap-4 mb-10">
+                                <div>
+                                    <h2 class="text-3xl font-black">${g.name} ${isLeader ? '👑' : ''}</h2>
+                                    <p class="text-[10px] font-black text-slate-400 mt-1 uppercase tracking-widest">${g.status}</p>
+                                </div>
+                                <div class="bg-indigo-50 px-6 py-4 rounded-2xl flex items-center gap-4">
+                                    <div>
+                                        <p class="text-[9px] font-black text-indigo-400 uppercase mb-1">Pot Size</p>
+                                        <p class="text-2xl font-black text-indigo-600">$${g.amount * g.max}</p>
+                                    </div>
+                                    <div class="border-l border-indigo-200 pl-4">
+                                        <p class="text-[9px] font-black text-indigo-400 uppercase mb-1">Contribution</p>
+                                        <p class="text-lg font-black text-indigo-900">$${g.amount}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="grid md:grid-cols-2 gap-10">
+                                <div>
+                                    <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Payout Order</h4>
+                                    <div class="space-y-2">
+                                        ${g.payoutOrder.map((uid, i) => {
+                                            const m = g.members.find(mx => mx.id === uid) || { name: 'Empty Slot' };
+                                            const isPaid = i < parseInt(g.status.match(/\d+/) || 0);
+                                            return `
+                                                <div class="flex items-center justify-between p-3 ${uid === user.id ? 'bg-indigo-600 text-white shadow-lg' : (isPaid ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-50')} rounded-xl">
+                                                    <span class="text-xs font-bold">${i+1}. ${m.name} ${isPaid ? '✓' : ''}</span>
+                                                    <span class="text-[10px] opacity-60">Turn ${i+1}</span>
+                                                </div>
+                                            `;
+                                        }).join('')}
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Live Ledger</h4>
+                                    <div class="space-y-4">
+                                        ${g.members.map(m => {
+                                            const monthKey = g.status.includes('5/6') ? 'm5' : 'm1';
+                                            const status = g.contributions[`${m.id}-${monthKey}`] || (m.trust < 60 ? 'missed' : 'pending');
+                                            return `
+                                                <div class="flex items-center justify-between border-b border-slate-50 pb-3" id="ledger-row-${m.id}">
+                                                    <div class="flex items-center gap-2">
+                                                        <div class="w-7 h-7 bg-slate-100 rounded text-[10px] font-bold flex items-center justify-center">${m.name[0]}</div>
+                                                        <div class="text-xs font-bold">${m.name} <p id="ledger-trust-${m.id}" class="text-[8px] text-emerald-500">Trust: ${m.trust}</p></div>
+                                                    </div>
+                                                    <span id="ledger-status-${m.id}" class="status-pill status-${status}">${status}</span>
+                                                </div>
+                                            `;
+                                        }).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Interaction -->
+                    <div class="lg:col-span-4 space-y-6">
+                        <div class="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col h-[500px]">
+                            <div class="p-4 border-b border-slate-50 flex justify-between items-center">
+                                <span class="text-[9px] font-black text-slate-400 uppercase">Circle Feed</span>
+                                <button onclick="openVoteModal('${g.id}')" class="text-[8px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded uppercase hover:bg-indigo-100 transition-colors">Start Vote</button>
+                            </div>
+                            <div id="chat-box" class="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar">
+                                ${g.chat.map(m => {
+                                    if (m.type === 'vote') {
+                                        const totalVotes = m.yes.length + m.no.length;
+                                        const pct = Math.min(100, (totalVotes / m.total) * 100);
+                                        return `
+                                            <div id="chat-item-${m.id}" class="bg-slate-50 border border-slate-100 p-4 rounded-2xl animate-slide-up">
+                                                <div class="flex justify-between items-start mb-2">
+                                                    <p class="text-[10px] font-black text-slate-400 uppercase">Community Vote</p>
+                                                    <i class="fas fa-poll text-indigo-300"></i>
+                                                </div>
+                                                <p class="text-xs font-bold mb-3 leading-relaxed">${m.topic}</p>
+                                                <div class="flex gap-2 mb-3">
+                                                    <button id="vote-yes-btn-${m.id}" onclick="castVote('${g.id}', '${m.id}', 'yes')" class="flex-1 py-2 rounded-lg text-[10px] font-black transition-all ${m.yes.includes(user.id) ? 'bg-emerald-500 text-white' : 'bg-white border border-slate-200 text-slate-400 hover:border-emerald-200'}">YES (<span id="vote-yes-count-${m.id}">${m.yes.length}</span>)</button>
+                                                    <button id="vote-no-btn-${m.id}" onclick="castVote('${g.id}', '${m.id}', 'no')" class="flex-1 py-2 rounded-lg text-[10px] font-black transition-all ${m.no.includes(user.id) ? 'bg-red-500 text-white' : 'bg-white border border-slate-200 text-slate-400 hover:border-red-200'}">NO (<span id="vote-no-count-${m.id}">${m.no.length}</span>)</button>
+                                                </div>
+                                                <div class="w-full bg-slate-200 h-1 rounded-full overflow-hidden">
+                                                    <div id="vote-progress-${m.id}" class="bg-indigo-500 h-full transition-all duration-500" style="width: ${pct}%"></div>
+                                                </div>
+                                            </div>
+                                        `;
+                                    }
+                                    if (m.type === 'sys') {
+                                        const sid = m.id || ("sys-" + Math.random().toString(16).slice(2));
+                                        return `
+                                            <div id="chat-item-${sid}" class="text-center">
+                                                <span class="bg-slate-50 text-slate-400 px-3 py-1 rounded-full text-[8px] font-black uppercase">${m.text}</span>
+                                            </div>
+                                        `;
+                                    }
+                                    const mid = m.id || ("msg-" + Math.random().toString(16).slice(2));
+                                    const isMe = m.sender.includes('Ama');
+                                    return `
+                                        <div id="chat-item-${mid}" class="flex flex-col ${isMe ? 'items-end' : 'items-start'}">
+                                            <div class="p-3 rounded-xl text-[11px] font-medium ${isMe ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-600'}">
+                                                ${m.text}
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                            <div class="p-3 bg-slate-50 flex gap-2">
+                                <input type="text" id="chat-input" placeholder="Message..." class="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none">
+                                <button onclick="sendChat('${g.id}')" class="w-8 h-8 rosa-gradient text-white rounded-lg flex items-center justify-center"><i class="fas fa-paper-plane text-[10px]"></i></button>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-3">
+                            <button onclick="makePayment('${g.id}')" class="w-full py-4 bg-emerald-500 text-white rounded-xl font-black text-xs hover:bg-emerald-600 transition-all">Make Payment ($${g.amount})</button>
+                            <button onclick="escalateIssue('${g.id}')" class="w-full py-4 bg-red-50 text-red-500 border border-red-100 rounded-xl font-black text-xs hover:bg-red-100 transition-all">Escalate Dispute to Rosa</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            showView('detail');
+            setTimeout(() => {
+                const box = document.getElementById('chat-box');
+                if(box) box.scrollTop = box.scrollHeight;
+            }, 100);
+        }
+
+        // --- HELPERS (NO RE-RENDER) ---
+        function chatScrollToBottom() {
+            const box = document.getElementById('chat-box');
+            if (box) box.scrollTop = box.scrollHeight;
+        }
+
+        function appendSystemMessage(gid, text) {
+            const g = groups.find(x => x.id === gid);
+            const msg = { id: 'sys-' + Date.now(), sender: 'System', text, type: 'sys' };
+            g.chat.push(msg);
+
+            const box = document.getElementById('chat-box');
+            if (!box) return;
+
+            const wrapper = document.createElement('div');
+            wrapper.id = `chat-item-${msg.id}`;
+            wrapper.className = "text-center";
+            wrapper.innerHTML = `<span class="bg-slate-50 text-slate-400 px-3 py-1 rounded-full text-[8px] font-black uppercase">${text}</span>`;
+            box.appendChild(wrapper);
+            chatScrollToBottom();
+        }
+
+        function appendUserMessage(gid, sender, text) {
+            const g = groups.find(x => x.id === gid);
+            const msg = { id: 'msg-' + Date.now(), sender, text, type: 'msg' };
+            g.chat.push(msg);
+
+            const box = document.getElementById('chat-box');
+            if (!box) return;
+
+            const isMe = sender.includes('Ama');
+            const wrapper = document.createElement('div');
+            wrapper.id = `chat-item-${msg.id}`;
+            wrapper.className = `flex flex-col ${isMe ? 'items-end' : 'items-start'}`;
+            wrapper.innerHTML = `
+                <div class="p-3 rounded-xl text-[11px] font-medium ${isMe ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-600'}">
+                    ${text}
+                </div>
+            `;
+            box.appendChild(wrapper);
+            chatScrollToBottom();
+        }
+
+        function appendVoteCard(gid, voteObj) {
+            const box = document.getElementById('chat-box');
+            if (!box) return;
+
+            const totalVotes = voteObj.yes.length + voteObj.no.length;
+            const pct = Math.min(100, (totalVotes / voteObj.total) * 100);
+
+            const wrapper = document.createElement('div');
+            wrapper.id = `chat-item-${voteObj.id}`;
+            wrapper.className = "bg-slate-50 border border-slate-100 p-4 rounded-2xl animate-slide-up";
+            wrapper.innerHTML = `
+                <div class="flex justify-between items-start mb-2">
+                    <p class="text-[10px] font-black text-slate-400 uppercase">Community Vote</p>
+                    <i class="fas fa-poll text-indigo-300"></i>
+                </div>
+                <p class="text-xs font-bold mb-3 leading-relaxed">${voteObj.topic}</p>
+                <div class="flex gap-2 mb-3">
+                    <button id="vote-yes-btn-${voteObj.id}" onclick="castVote('${gid}', '${voteObj.id}', 'yes')" class="flex-1 py-2 rounded-lg text-[10px] font-black transition-all bg-white border border-slate-200 text-slate-400 hover:border-emerald-200">YES (<span id="vote-yes-count-${voteObj.id}">${voteObj.yes.length}</span>)</button>
+                    <button id="vote-no-btn-${voteObj.id}" onclick="castVote('${gid}', '${voteObj.id}', 'no')" class="flex-1 py-2 rounded-lg text-[10px] font-black transition-all bg-white border border-slate-200 text-slate-400 hover:border-red-200">NO (<span id="vote-no-count-${voteObj.id}">${voteObj.no.length}</span>)</button>
+                </div>
+                <div class="w-full bg-slate-200 h-1 rounded-full overflow-hidden">
+                    <div id="vote-progress-${voteObj.id}" class="bg-indigo-500 h-full transition-all duration-500" style="width:${pct}%"></div>
+                </div>
+            `;
+            box.appendChild(wrapper);
+            chatScrollToBottom();
+        }
+
+        function updateVoteUI(vid, yesCount, noCount, total, picked) {
+            const yesEl = document.getElementById(`vote-yes-count-${vid}`);
+            const noEl = document.getElementById(`vote-no-count-${vid}`);
+            const prog = document.getElementById(`vote-progress-${vid}`);
+            const yesBtn = document.getElementById(`vote-yes-btn-${vid}`);
+            const noBtn = document.getElementById(`vote-no-btn-${vid}`);
+
+            if (yesEl) yesEl.textContent = yesCount;
+            if (noEl) noEl.textContent = noCount;
+
+            const pct = Math.min(100, ((yesCount + noCount) / total) * 100);
+            if (prog) prog.style.width = `${pct}%`;
+
+            if (yesBtn) yesBtn.className = `flex-1 py-2 rounded-lg text-[10px] font-black transition-all ${picked === 'yes' ? 'bg-emerald-500 text-white' : 'bg-white border border-slate-200 text-slate-400 hover:border-emerald-200'}`;
+            if (noBtn) noBtn.className = `flex-1 py-2 rounded-lg text-[10px] font-black transition-all ${picked === 'no' ? 'bg-red-500 text-white' : 'bg-white border border-slate-200 text-slate-400 hover:border-red-200'}`;
+        }
+
+        function setLedgerStatus(memberId, status) {
+            const pill = document.getElementById(`ledger-status-${memberId}`);
+            if (!pill) return;
+            pill.textContent = status;
+            pill.className = `status-pill status-${status}`;
+        }
+
+        function removeJoinRequestCard(rid) {
+            const el = document.getElementById(`req-${rid}`);
+            if (el) el.remove();
+        }
+
+        // --- VOTING MODAL LOGIC ---
+        function openVoteModal(gid) {
+            currentGroupId = gid;
+            document.getElementById('vote-modal').classList.replace('hidden', 'flex');
+            document.getElementById('vote-topic-input').focus();
+        }
+
+        function closeVoteModal() {
+            document.getElementById('vote-modal').classList.replace('flex', 'hidden');
+            document.getElementById('vote-topic-input').value = '';
+        }
+
+        function submitVoteProposal() {
+            const topic = document.getElementById('vote-topic-input').value.trim();
+            if (!topic) return toast("Please enter a topic to vote on.");
+
+            const g = groups.find(x => x.id === currentGroupId);
+            const voteObj = {
+                id: 'v-' + Date.now(),
+                type: 'vote',
+                topic: topic,
+                yes: [],
+                no: [],
+                total: g.members.length
+            };
+            g.chat.push(voteObj);
+
+            closeVoteModal();
+            appendVoteCard(currentGroupId, voteObj);
+            toast("Vote proposed to the circle.");
+        }
+
+        function castVote(gid, vid, option) {
+            const g = groups.find(x => x.id === gid);
+            const v = g.chat.find(m => m.id === vid);
+            if (!v) return;
+
+            v.yes = v.yes.filter(id => id !== user.id);
+            v.no  = v.no.filter(id => id !== user.id);
+
+            v[option].push(user.id);
+
+            updateVoteUI(vid, v.yes.length, v.no.length, v.total, option);
+            toast(`Vote cast: ${option.toUpperCase()}`);
+        }
+
+        // --- LEADER ACTIONS ---
+        function handleRequest(gid, rid, approved) {
+            const g = groups.find(x => x.id === gid);
+            const reqIdx = g.requests.findIndex(r => r.id === rid);
+            const req = g.requests[reqIdx];
+            if (!req) return;
+
+            if (approved) {
+                g.members.push({ ...req, role: 'Member' });
+                g.payoutOrder.push(req.id);
+                appendSystemMessage(gid, `${req.name} has joined the circle.`);
+                toast(`${req.name} added to group!`);
+            } else {
+                toast(`Request from ${req.name} declined.`);
+            }
+
+            g.requests.splice(reqIdx, 1);
+            removeJoinRequestCard(req.id);
+        }
+
+        // --- ACTIONS ---
+        function requestJoin(gid) {
+            const g = groups.find(x => x.id === gid);
+            toast(`Join request sent to ${g.name}. Waiting for leader approval.`);
+        }
+
+        function makePayment(gid) {
+            const g = groups.find(x => x.id === gid);
+            const monthKey = g.status.includes('5/6') ? 'm5' : 'm1';
+
+            g.contributions[`${user.id}-${monthKey}`] = 'paid';
+            setLedgerStatus(user.id, 'paid');
+            appendSystemMessage(gid, `Ama paid her contribution.`);
+
+            user.trust = Math.min(100, user.trust + 1);
+            updateTrust();
+            toast("Payment successful! Trust Score +1");
+        }
+
+        function escalateIssue(gid) {
+            appendSystemMessage(gid, `${user.name} reported a dispute. Admin notified.`);
+            toast("Escalated to Rosa Support.");
+        }
+
+        function sendChat(gid) {
+            const inp = document.getElementById('chat-input');
+            const text = inp.value.trim();
+            if (!text) return;
+
+            inp.value = '';
+            appendUserMessage(gid, user.name, text);
+        }
+
+        function updateTrust() {
+            document.getElementById('global-trust').innerText = user.trust;
+        }
+
+        function toast(msg) {
+            const t = document.createElement('div');
+            t.className = "bg-slate-900 text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 animate-slide-up z-[120]";
+            t.innerHTML = `<i class="fas fa-check-circle text-indigo-400"></i> <span class="text-xs font-bold">${msg}</span>`;
+            document.getElementById('toast-container').appendChild(t);
+            setTimeout(() => t.remove(), 3000);
+        }
+
+        // --- FORM LOGIC ---
+        const gAmt = document.getElementById('g-amount');
+        const gCnt = document.getElementById('g-count');
+        const updatePot = () => {
+            document.getElementById('pot-calc').innerText = `$${((gAmt.value || 0) * (gCnt.value || 0)).toLocaleString()} / Month Pot`;
+        };
+        gAmt.addEventListener('input', updatePot);
+        gCnt.addEventListener('input', updatePot);
+
+        document.getElementById('create-group-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const id = 'g-' + Date.now();
+            const newG = {
+                id, name: document.getElementById('g-name').value,
+                amount: parseInt(gAmt.value), max: parseInt(gCnt.value),
+                leaderId: user.id, status: 'Ama is Leader', joined: true,
+                payoutOrder: [user.id],
+                members: [{ ...user, role: 'Leader' }],
+                contributions: {}, chat: [{ id: 'sys-' + Date.now(), sender: 'System', text: 'New custom circle created.', type: 'sys' }],
+                votes: [], requests: []
+            };
+            groups.unshift(newG);
+            toggleTabs('joined');
+            openGroup(id);
+            toast("Circle Live!");
+        });
+
+        // Init
+        renderGroups();
+    </script>
+</body>
+</html>
