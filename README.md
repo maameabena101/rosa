@@ -1,5 +1,5 @@
 ## Project Brief 
-## To use plaform please click link : https://maameabena101.github.io/rosa/
+## To use platform please click link : https://maameabena101.github.io/rosa/
 # Rosa — Trust-First Digital Rotating Savings
 ## Overview
 Rosa is a trust-first digital platform that formalizes rotating savings groups (ROSCA / susu) by replacing informal coordination with transparency, governance, and accountability.
