@@ -1,19 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Rosa | Digital Trust Circles</title>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
+    <!-- Paystack Inline (we still include it, BUT we also load dynamically as backup) -->
+    <script src="https://js.paystack.co/v1/inline.js"></script>
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-        
-        html, body { height: 100%; } /* NEW: helps full-height layouts */
+
+        html, body { height: 100%; }
 
         body {
             font-family: 'Plus Jakarta Sans', sans-serif;
             background-color: #F8FAFC;
+            color: #0f172a;
         }
 
         .rosa-gradient { background: linear-gradient(135deg, #4f46e5 0%, #9333ea 100%); }
@@ -26,692 +32,1654 @@
 
         .view-section { display: none; }
         .view-section.active { display: block; }
+        .view-fill { min-height: calc(100vh - 80px); }
 
-        .status-pill { font-size: 10px; font-weight: 800; padding: 4px 10px; border-radius: 999px; text-transform: uppercase; }
+        .status-pill { font-size: 11px; font-weight: 900; padding: 5px 12px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.04em; }
         .status-paid { background: #dcfce7; color: #166534; }
         .status-pending { background: #fef9c3; color: #854d0e; }
         .status-missed { background: #fee2e2; color: #991b1b; }
+        .status-covered { background: #e0f2fe; color: #075985; }
 
         .custom-scrollbar::-webkit-scrollbar { width: 5px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
-        
+
         @keyframes slideUp { from { transform: translateY(15px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .animate-slide-up { animation: slideUp 0.3s ease-out; }
 
-        /* Modal specific animation */
         .modal-backdrop { background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(4px); }
+        .readable-label  { color: #334155; font-weight: 900; letter-spacing: 0.14em; }
+
+        /* Landing visuals */
+        @keyframes floaty { 0%,100% { transform: translateY(0px); } 50% { transform: translateY(-10px); } }
+        @keyframes blob { 0% { transform: translate(0px,0px) scale(1); } 50% { transform: translate(12px,-10px) scale(1.06);} 100% { transform: translate(0px,0px) scale(1);} }
+        .floaty { animation: floaty 4.5s ease-in-out infinite; }
+        .blob { animation: blob 7s ease-in-out infinite; filter: blur(12px); opacity: 0.85; }
+
+        .hero-grid { display: grid; grid-template-columns: 1fr; gap: 2.25rem; }
+        @media (min-width: 1024px) { .hero-grid { grid-template-columns: 1.05fr 0.95fr; align-items: center; } }
     </style>
 </head>
-<body class="text-slate-900 min-h-screen"> <!-- NEW: min-h-screen -->
 
-    <div id="toast-container" class="fixed top-6 right-6 z-[100] flex flex-col gap-3"></div>
+<body class="min-h-screen">
 
-    <!-- Vote Modal -->
-    <div id="vote-modal" class="fixed inset-0 z-[110] modal-backdrop items-center justify-center hidden">
-        <div class="bg-white w-full max-w-md mx-6 p-8 rounded-[2.5rem] shadow-2xl animate-slide-up">
-            <h3 class="text-2xl font-black mb-2">Propose a Vote</h3>
-            <p class="text-slate-400 text-sm font-medium mb-6">What would you like the circle to decide on?</p>
-            
-            <textarea id="vote-topic-input" rows="3" placeholder="e.g. Increase monthly contribution to $400 for the next cycle?" class="w-full px-5 py-4 bg-slate-50 rounded-2xl border-2 border-transparent focus:border-indigo-500 outline-none transition-all font-bold text-sm resize-none mb-6"></textarea>
-            
-            <div class="flex gap-3">
-                <button onclick="closeVoteModal()" class="flex-1 py-4 bg-slate-100 text-slate-500 rounded-xl font-black text-xs">Cancel</button>
-                <button onclick="submitVoteProposal()" class="flex-1 py-4 rosa-gradient text-white rounded-xl font-black text-xs shadow-lg shadow-indigo-100">Post to Chat</button>
+<div id="toast-container" class="fixed top-6 right-6 z-[200] flex flex-col gap-3"></div>
+
+<!-- Vote Modal -->
+<div id="vote-modal" class="fixed inset-0 z-[210] modal-backdrop items-center justify-center hidden">
+    <div class="bg-white w-full max-w-md mx-6 p-8 rounded-[2.5rem] shadow-2xl animate-slide-up">
+        <h3 class="text-2xl font-black mb-2">Propose a Vote</h3>
+        <p class="text-slate-600 text-sm font-semibold mb-6">What would you like the circle to decide on?</p>
+
+        <textarea id="vote-topic-input" rows="3"
+                  placeholder="e.g. Change contribution to GH¢400 next cycle?"
+                  class="w-full px-5 py-4 bg-slate-50 rounded-2xl border-2 border-transparent focus:border-indigo-500 outline-none transition-all font-bold text-sm resize-none mb-6"></textarea>
+
+        <div class="flex gap-3">
+            <button onclick="closeVoteModal()" class="flex-1 py-4 bg-slate-100 text-slate-700 rounded-xl font-black text-xs">Cancel</button>
+            <button onclick="submitVoteProposal()" class="flex-1 py-4 rosa-gradient text-white rounded-xl font-black text-xs shadow-lg shadow-indigo-100">Post to Chat</button>
+        </div>
+    </div>
+</div>
+
+<!-- Leader Action Modal (REAL actions) -->
+<div id="leader-action-modal" class="fixed inset-0 z-[215] modal-backdrop items-center justify-center hidden">
+    <div class="bg-white w-full max-w-md mx-6 p-8 rounded-[2.5rem] shadow-2xl animate-slide-up">
+        <h3 class="text-2xl font-black mb-2">Leader Actions</h3>
+        <p class="text-slate-600 text-sm font-semibold mb-6">Take quick actions as the circle leader (no voting required).</p>
+
+        <div class="space-y-4 mb-6">
+            <div>
+                <label class="text-[11px] readable-label uppercase ml-1">Member</label>
+                <select id="leader-member-select"
+                        class="w-full mt-2 px-6 py-4 bg-slate-50 rounded-2xl outline-none font-bold text-slate-900"></select>
+            </div>
+
+            <div class="grid grid-cols-1 gap-3">
+                <button onclick="leaderPauseMember()"
+                        class="w-full py-4 bg-amber-50 text-amber-800 border border-amber-200 rounded-xl font-black text-xs hover:bg-amber-100 transition-all">
+                    <i class="fas fa-pause-circle mr-2"></i> Pause Member
+                </button>
+
+                <button onclick="leaderRemoveMember()"
+                        class="w-full py-4 bg-red-50 text-red-700 border border-red-200 rounded-xl font-black text-xs hover:bg-red-100 transition-all">
+                    <i class="fas fa-user-slash mr-2"></i> Remove Member
+                </button>
+
+                <button onclick="leaderContactSupport()"
+                        class="w-full py-4 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-xl font-black text-xs hover:bg-indigo-100 transition-all">
+                    <i class="fas fa-headset mr-2"></i> Talk to Customer Service
+                </button>
+            </div>
+
+            <p class="text-[11px] text-slate-600 font-semibold">
+                “Pause” prevents a member from receiving payouts until resolved.
+                “Remove” kicks them out. “Customer Service” escalates directly to Rosa support.
+            </p>
+        </div>
+
+        <button onclick="closeLeaderActionModal()" class="w-full py-4 bg-slate-100 text-slate-700 rounded-xl font-black text-xs">
+            Close
+        </button>
+    </div>
+</div>
+
+<!-- Nav -->
+<nav class="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b border-slate-200/60 px-6 py-4">
+    <div class="w-full flex justify-between items-center">
+        <div class="flex items-center gap-2 cursor-pointer" onclick="showView('landing')">
+            <div class="rosa-gradient text-white w-9 h-9 rounded-xl flex items-center justify-center font-black shadow-lg">R</div>
+            <span class="text-xl font-black tracking-tighter rosa-text-gradient">Rosa</span>
+        </div>
+        <div class="flex items-center gap-6">
+            <button onclick="showView('dashboard')" class="text-sm font-extrabold text-slate-700 hover:text-indigo-600 transition-colors">Explorer</button>
+            <div class="flex items-center gap-3 border-l pl-6 border-slate-200">
+                <div class="text-right">
+                    <p class="text-[10px] readable-label uppercase leading-none">Your Trust</p>
+                    <p id="global-trust" class="text-sm font-black text-emerald-600">100</p>
+                </div>
+                <div class="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center font-bold text-xs text-slate-700">A</div>
             </div>
         </div>
     </div>
+</nav>
 
-    <!-- Nav -->
-    <nav class="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b border-slate-200/60 px-6 py-4">
-        <!-- UPDATED: max-w-7xl mx-auto -> w-full so it stretches across laptop width -->
-        <div class="w-full flex justify-between items-center">
-            <div class="flex items-center gap-2 cursor-pointer" onclick="showView('landing')">
-                <div class="rosa-gradient text-white w-9 h-9 rounded-xl flex items-center justify-center font-black shadow-lg">R</div>
-                <!-- UPDATED: Rsa -> Rosa -->
-                <span class="text-xl font-black tracking-tighter rosa-text-gradient">Rosa</span>
-            </div>
-            <div class="flex items-center gap-6">
-                <button onclick="showView('dashboard')" class="text-sm font-bold text-slate-500 hover:text-indigo-600 transition-colors">Explorer</button>
-                <div class="flex items-center gap-3 border-l pl-6 border-slate-200">
-                    <div class="text-right">
-                        <p class="text-[8px] font-black text-slate-400 uppercase leading-none">Your Trust</p>
-                        <p id="global-trust" class="text-xs font-black text-emerald-500">100</p>
-                    </div>
-                    <div class="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center font-bold text-xs text-slate-500">A</div>
-                </div>
-            </div>
-        </div>
-    </nav>
-
-    <!-- LANDING -->
-    <section id="view-landing" class="view-section active animate-slide-up">
-        <!-- UPDATED: max-w-7xl mx-auto -> w-full to use full laptop width -->
-        <div class="w-full px-6 py-20 lg:py-32">
-            <div class="max-w-3xl">
-                <h1 class="text-6xl lg:text-8xl font-black tracking-tighter leading-[0.9] mb-8">
+<!-- LANDING -->
+<section id="view-landing" class="view-section active animate-slide-up view-fill">
+    <div class="w-full px-6 py-10 lg:py-14">
+        <div class="max-w-6xl mx-auto hero-grid view-fill">
+            <div class="flex flex-col justify-center">
+                <h1 class="text-6xl lg:text-8xl font-black tracking-tighter leading-[0.92] mb-7">
                     Trust-first <br><span class="rosa-text-gradient">group savings.</span>
                 </h1>
-                <p class="text-xl text-slate-500 font-medium mb-12 leading-relaxed">
-                    A Rotating Savings and Credit Association is the world’s most successful informal banking system. Known as Tanda in Mexico, Chama in Kenya, Susu in West Africa, and Hui in Asia. It's simple: A group of people contributes a fixed amount every month. Each month, one member takes the entire collection (the "Pot"). By the end of the cycle, everyone has saved a significant sum, interest-free.
+
+                <p class="text-xl text-slate-700 font-semibold mb-5 leading-relaxed">
+                    Rosa helps savings circles run smoothly: contribute on a schedule your circle chooses (daily, weekly, or monthly).
+                    Circles only start when they’re full, and the first period is a refundable security deposit per person.
                 </p>
+
+                <p class="text-base text-slate-700 font-semibold mb-8 leading-relaxed">
+                    A Rotating Savings and Credit Association is the world’s most successful informal banking system.
+                    Known as Tanda in Mexico, Chama in Kenya, Susu in West Africa, and Hui in Asia.
+                    A group contributes a fixed amount each period. Each period, one member takes the whole "Pot".
+                    By the end, everyone has saved a significant sum, interest-free.
+                </p>
+
+                <p class="text-sm text-slate-600 font-bold mb-10">All amounts shown in Ghana cedis (GH¢).</p>
+
                 <div class="flex flex-wrap gap-4">
                     <button onclick="showView('create')" class="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black shadow-xl shadow-indigo-100">Create Custom Group</button>
-                    <button onclick="showView('dashboard')" class="bg-white border border-slate-200 px-8 py-4 rounded-2xl font-black">Browse 20+ Live Circles</button>
+                    <button onclick="showView('dashboard')" class="bg-white border border-slate-200 px-8 py-4 rounded-2xl font-black text-slate-900">Browse Circles</button>
+                </div>
+            </div>
+
+            <!-- Animated Hero -->
+            <div class="relative flex items-center justify-center">
+                <div class="absolute -top-10 -left-8 w-56 h-56 rounded-full bg-indigo-300 blob"></div>
+                <div class="absolute -bottom-10 -right-10 w-64 h-64 rounded-full bg-sky-300 blob" style="animation-delay: 0.9s;"></div>
+
+                <div class="relative bg-white border border-slate-100 shadow-2xl rounded-[2.75rem] p-6 lg:p-8 w-full max-w-[520px] floaty">
+                    <div class="flex items-center justify-between mb-5">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-2xl rosa-gradient text-white flex items-center justify-center font-black">R</div>
+                            <div>
+                                <p class="text-sm font-black text-slate-900 leading-tight">Rosa</p>
+                                <p class="text-[11px] font-black text-slate-500 uppercase tracking-widest leading-tight">Circle chat</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-[11px] font-black bg-emerald-50 text-emerald-700 px-3 py-2 rounded-xl border border-emerald-100">Paid</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-50 border border-slate-100 rounded-[2rem] p-5 mb-5">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center font-black text-slate-700">A</div>
+                            <div class="flex-1">
+                                <p class="text-sm font-black text-slate-900 leading-tight">Ama</p>
+                                <p class="text-[11px] font-semibold text-slate-600 leading-tight">Just paid my contribution.</p>
+                            </div>
+                            <div class="text-[11px] font-black text-slate-500">Now</div>
+                        </div>
+
+                        <div class="space-y-3">
+                            <div class="flex justify-end">
+                                <div class="bg-indigo-600 text-white px-4 py-3 rounded-2xl text-sm font-semibold shadow-md max-w-[85%]">
+                                    Payment confirmed. Thank you.
+                                </div>
+                            </div>
+                            <div class="flex justify-start">
+                                <div class="bg-white border border-slate-200 text-slate-800 px-4 py-3 rounded-2xl text-sm font-semibold max-w-[85%]">
+                                    Next payment date updated in your dashboard.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-3">
+                        <div class="bg-indigo-50 border border-indigo-100 rounded-2xl p-4">
+                            <p class="text-[10px] font-black text-indigo-700 uppercase tracking-widest mb-1">Trust</p>
+                            <p class="text-xl font-black text-indigo-900">100</p>
+                        </div>
+                        <div class="bg-sky-50 border border-sky-100 rounded-2xl p-4">
+                            <p class="text-[10px] font-black text-sky-700 uppercase tracking-widest mb-1">Pot</p>
+                            <p class="text-xl font-black text-sky-900">GH¢</p>
+                        </div>
+                        <div class="bg-slate-50 border border-slate-100 rounded-2xl p-4">
+                            <p class="text-[10px] font-black text-slate-700 uppercase tracking-widest mb-1">Chat</p>
+                            <p class="text-xl font-black text-slate-900">Live</p>
+                        </div>
+                    </div>
+
+                    <div class="mt-5 flex items-center gap-2">
+                        <div class="flex-1 h-11 bg-slate-50 border border-slate-100 rounded-2xl"></div>
+                        <div class="w-11 h-11 rosa-gradient text-white rounded-2xl flex items-center justify-center shadow-lg">
+                            <i class="fas fa-paper-plane text-[12px]"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- /Hero -->
+        </div>
+    </div>
+</section>
+
+<!-- DASHBOARD -->
+<section id="view-dashboard" class="view-section w-full px-6 py-12 animate-slide-up view-fill">
+    <div class="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6">
+        <div>
+            <h2 class="text-3xl font-black tracking-tight">Marketplace</h2>
+
+            <div class="flex flex-wrap items-center gap-3 mt-5">
+                <div class="flex bg-slate-100 p-1 rounded-lg w-fit">
+                    <button id="tab-explore" onclick="toggleTabs('explore')" class="px-6 py-2 rounded-md text-sm font-black transition-all bg-white shadow-sm text-indigo-700">Public Market</button>
+                    <button id="tab-joined" onclick="toggleTabs('joined')" class="px-6 py-2 rounded-md text-sm font-black transition-all text-slate-700">My Memberships</button>
+                </div>
+
+                <!-- Frequency Filter -->
+                <div class="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2">
+                    <i class="fas fa-filter text-slate-500 text-xs"></i>
+                    <select id="freq-filter" onchange="renderGroups()" class="text-sm font-black text-slate-800 outline-none bg-transparent">
+                        <option value="all">All Frequencies</option>
+                        <option value="Daily">Daily</option>
+                        <option value="Weekly">Weekly</option>
+                        <option value="Monthly">Monthly</option>
+                    </select>
+                </div>
+
+                <!-- Search (name or invite code) -->
+                <div class="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2">
+                    <i class="fas fa-search text-slate-500 text-xs"></i>
+                    <input id="search-input"
+                           type="text"
+                           placeholder="Search name or invite code (e.g. ROSA-ABCDE)"
+                           class="w-[260px] md:w-[340px] text-sm font-bold text-slate-800 outline-none bg-transparent"
+                           oninput="setSearchQuery(this.value)" />
+                    <button onclick="clearSearch()" class="text-[10px] font-black text-slate-700 bg-slate-100 px-3 py-2 rounded uppercase hover:bg-slate-200 transition-colors">Clear</button>
                 </div>
             </div>
         </div>
-    </section>
 
-    <!-- DASHBOARD (Explorer) -->
-    <!-- UPDATED: max-w-7xl mx-auto -> w-full -->
-    <section id="view-dashboard" class="view-section w-full px-6 py-12 animate-slide-up">
-        <div class="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4">
+        <button onclick="showView('create')" class="bg-slate-900 text-white px-6 py-3 rounded-xl text-sm font-black hover:bg-indigo-600 transition-all">
+            + Start Your Circle
+        </button>
+    </div>
+
+    <div id="groups-grid" class="grid md:grid-cols-2 lg:grid-cols-3 gap-8"></div>
+</section>
+
+<!-- CREATE -->
+<section id="view-create" class="view-section w-full px-6 py-12 animate-slide-up view-fill">
+    <div class="bg-white p-10 md:p-14 rounded-[3rem] shadow-2xl border border-slate-100 w-full">
+        <button onclick="showView('dashboard')" class="text-[11px] font-black text-slate-700 hover:text-indigo-600 uppercase mb-6 flex items-center gap-2">
+            <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </button>
+
+        <h2 class="text-3xl font-black mb-2">Build Your Circle</h2>
+        <p class="text-slate-700 font-semibold mb-10">Circles only start when full. First period is a refundable security deposit per person.</p>
+
+        <form id="create-group-form" class="space-y-6">
             <div>
-                <h2 class="text-3xl font-black tracking-tight">Marketplace</h2>
-                <div class="flex bg-slate-100 p-1 rounded-lg mt-4 w-fit">
-                    <button id="tab-explore" onclick="toggleTabs('explore')" class="px-6 py-2 rounded-md text-xs font-black transition-all bg-white shadow-sm text-indigo-600">Public Market</button>
-                    <button id="tab-joined" onclick="toggleTabs('joined')" class="px-6 py-2 rounded-md text-xs font-black transition-all text-slate-500">My Memberships</button>
+                <label class="text-[11px] readable-label uppercase ml-1">Group Title</label>
+                <input type="text" id="g-name" required placeholder="e.g. Makola Market Savings"
+                       class="w-full mt-2 px-6 py-4 bg-slate-50 rounded-2xl border-2 border-transparent focus:border-indigo-500 outline-none transition-all font-bold text-slate-900">
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="text-[11px] readable-label uppercase ml-1">Contribution Amount (GH¢)</label>
+                    <input type="number" id="g-amount" required placeholder="100"
+                           class="w-full mt-2 px-6 py-4 bg-slate-50 rounded-2xl outline-none font-bold text-slate-900">
+                </div>
+                <div>
+                    <label class="text-[11px] readable-label uppercase ml-1">Member Count</label>
+                    <input type="number" id="g-count" required placeholder="6"
+                           class="w-full mt-2 px-6 py-4 bg-slate-50 rounded-2xl outline-none font-bold text-slate-900">
                 </div>
             </div>
-            <button onclick="showView('create')" class="bg-slate-900 text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-indigo-600 transition-all">+ Start Your Circle</button>
-        </div>
-        <div id="groups-grid" class="grid md:grid-cols-2 lg:grid-cols-3 gap-8"></div>
-    </section>
 
-    <!-- CREATE -->
-    <!-- UPDATED: max-w-2xl -> max-w-5xl for better laptop fit (still centered & clean) -->
-    <section id="view-create" class="view-section max-w-5xl mx-auto px-6 py-16 animate-slide-up">
-        <div class="bg-white p-10 md:p-14 rounded-[3rem] shadow-2xl border border-slate-100">
-            <button onclick="showView('dashboard')" class="text-[10px] font-black text-slate-400 hover:text-indigo-600 uppercase mb-6 flex items-center gap-2"><i class="fas fa-arrow-left"></i> Back to Dashboard</button>
-            <h2 class="text-3xl font-black mb-2">Build Your Circle</h2>
-            <p class="text-slate-400 font-medium mb-10">Define your own amount and member limits.</p>
-            
-            <form id="create-group-form" class="space-y-6">
-                <div>
-                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Group Title</label>
-                    <input type="text" id="g-name" required placeholder="e.g. Makola Market Savings" class="w-full mt-2 px-6 py-4 bg-slate-50 rounded-2xl border-2 border-transparent focus:border-indigo-500 outline-none transition-all font-bold">
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Monthly Amount ($)</label>
-                        <input type="number" id="g-amount" required placeholder="100" class="w-full mt-2 px-6 py-4 bg-slate-50 rounded-2xl outline-none font-bold">
-                    </div>
-                    <div>
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Member Count</label>
-                        <input type="number" id="g-count" required placeholder="6" class="w-full mt-2 px-6 py-4 bg-slate-50 rounded-2xl outline-none font-bold">
-                    </div>
-                </div>
-                <div class="p-6 bg-indigo-50 rounded-2xl border border-indigo-100">
-                    <p id="pot-calc" class="text-2xl font-black text-indigo-900">$0.00 / Month Pot</p>
-                    <p class="text-[10px] text-indigo-500 mt-2">The first month acts as a Security Reserve.</p>
-                </div>
-                <button type="submit" class="w-full rosa-gradient text-white py-5 rounded-2xl font-black text-lg shadow-xl">Launch Circle</button>
-            </form>
-        </div>
-    </section>
+            <div>
+                <label class="text-[11px] readable-label uppercase ml-1">Contribution Frequency</label>
+                <select id="g-frequency" required class="w-full mt-2 px-6 py-4 bg-slate-50 rounded-2xl outline-none font-bold text-slate-900">
+                    <option value="Monthly">Monthly</option>
+                    <option value="Weekly">Weekly</option>
+                    <option value="Daily">Daily</option>
+                </select>
+                <p class="text-[11px] text-slate-600 font-semibold mt-2">Members can filter and join circles by frequency.</p>
+            </div>
 
-    <!-- DETAIL -->
-    <!-- UPDATED: max-w-7xl mx-auto -> w-full -->
-    <section id="view-detail" class="view-section w-full px-6 py-12 animate-slide-up">
-        <div class="mb-8">
-            <button onclick="showView('dashboard')" class="text-[10px] font-black text-slate-400 hover:text-indigo-600 uppercase flex items-center gap-2"><i class="fas fa-arrow-left"></i> Exit to Dashboard</button>
-        </div>
-        <div id="detail-content"></div>
-    </section>
+            <div class="p-6 bg-indigo-50 rounded-2xl border border-indigo-100">
+                <p id="pot-calc" class="text-2xl font-black text-indigo-950">GH¢0 / Period Pot</p>
+                <p class="text-[11px] text-indigo-700 font-semibold mt-2">
+                    Security Deposit: each member pays one extra first period (refundable). If a member misses once later, their deposit can cover them once.
+                </p>
+            </div>
 
-    <script>
-        // --- DATA ---
-        let user = { id: 'u-1', name: 'Ama (You)', trust: 100 };
-        
-        const publicGroupTitles = [
-            "Kumasi Traders", "Lagos Techies", "Nairobi Creatives", "Cape Town Surfers", "Accra Foodies",
-            "Abidjan Fashionistas", "Johannesburg Miners", "Kigali Founders", "Dakar Artists", "Cairo Engineers",
-            "Casablanca Bakers", "Luanda Logistics", "Harare Teachers", "Lusaka Farmers", "Banjul Tourism",
-            "Maputo Media", "Windhoek Real Estate", "Gaborone Diamonds", "Kampala Transporters", "Dar Es Salaam Port"
+            <button type="submit" class="w-full rosa-gradient text-white py-5 rounded-2xl font-black text-lg shadow-xl">
+                Launch Circle
+            </button>
+        </form>
+    </div>
+</section>
+
+<!-- DETAIL -->
+<section id="view-detail" class="view-section w-full px-6 py-12 animate-slide-up view-fill">
+    <div class="mb-8">
+        <button onclick="showView('dashboard')" class="text-[11px] font-black text-slate-700 hover:text-indigo-600 uppercase flex items-center gap-2">
+            <i class="fas fa-arrow-left"></i> Exit to Dashboard
+        </button>
+    </div>
+    <div id="detail-content"></div>
+</section>
+
+<script>
+    // --- USER ---
+    let user = { id: 'u-1', name: 'Ama (You)', trust: 100 };
+
+    // ✅ Paystack Public Key (your test key)
+    const PAYSTACK_PUBLIC_KEY = "pk_test_59d6be0654ecdcfbe0f39668f2601bfaa889e451";
+
+    // --- UI STATE ---
+    let activeTab = 'explore';
+    let currentGroupId = null;
+    let searchQuery = "";
+    let paystackScriptLoading = false;
+
+    // Currency helper
+    function fmt(n) {
+        const val = Number(n || 0);
+        return `GH¢${val.toLocaleString()}`;
+    }
+
+    // Invite code generator
+    function inviteCodeFromGroupId(gid) {
+        const s = String(gid || "");
+        let hash = 0;
+        for (let i = 0; i < s.length; i++) hash = ((hash << 5) - hash) + s.charCodeAt(i);
+        const code = Math.abs(hash).toString(36).toUpperCase().slice(0, 5).padEnd(5, "X");
+        return `ROSA-${code}`;
+    }
+
+    function setSearchQuery(v) {
+        searchQuery = (v || "").trim();
+        renderGroups();
+    }
+    function clearSearch() {
+        searchQuery = "";
+        const si = document.getElementById("search-input");
+        if (si) si.value = "";
+        renderGroups();
+    }
+
+    // --- PAYSTACK FIX: dynamic script loader ---
+    function loadPaystackScript() {
+        return new Promise((resolve, reject) => {
+            // already loaded
+            if (typeof PaystackPop !== "undefined") return resolve(true);
+
+            // if already trying to load, wait a bit then resolve/reject
+            if (paystackScriptLoading) {
+                let tries = 0;
+                const check = setInterval(() => {
+                    tries++;
+                    if (typeof PaystackPop !== "undefined") {
+                        clearInterval(check);
+                        resolve(true);
+                    }
+                    if (tries > 20) { // ~2 seconds
+                        clearInterval(check);
+                        reject(new Error("Paystack blocked or not available."));
+                    }
+                }, 100);
+                return;
+            }
+
+            paystackScriptLoading = true;
+
+            const existing = document.querySelector('script[src="https://js.paystack.co/v1/inline.js"]');
+            if (existing) {
+                // wait for it
+                let tries = 0;
+                const check = setInterval(() => {
+                    tries++;
+                    if (typeof PaystackPop !== "undefined") {
+                        clearInterval(check);
+                        paystackScriptLoading = false;
+                        resolve(true);
+                    }
+                    if (tries > 30) {
+                        clearInterval(check);
+                        paystackScriptLoading = false;
+                        reject(new Error("Paystack script exists but failed to load (blocked)."));
+                    }
+                }, 100);
+                return;
+            }
+
+            const s = document.createElement("script");
+            s.src = "https://js.paystack.co/v1/inline.js";
+            s.async = true;
+            s.onload = () => {
+                paystackScriptLoading = false;
+                resolve(true);
+            };
+            s.onerror = () => {
+                paystackScriptLoading = false;
+                reject(new Error("Paystack script blocked by browser/network."));
+            };
+            document.head.appendChild(s);
+        });
+    }
+
+    // --- GROUP RULES ---
+    function isFull(g) { return (g.members || []).length >= g.max; }
+    function isStarted(g) { return !!g.started; }
+
+    function currentPeriodKey(g) {
+        if (g.phase === 'reserve') return 'dep';
+        if (g.phase === 'cycle') return `m${g.cycleMonth}`;
+        return 'na';
+    }
+
+    function statusLabel(g) {
+        if (g.phase === 'recruiting') return `Recruiting`;
+        if (g.phase === 'reserve') return `Reserve Period (Deposit)`;
+        if (g.phase === 'cycle') return `Cycle: Period ${g.cycleMonth}/${g.max}`;
+        if (g.phase === 'completed') return `Completed`;
+        return g.status || 'Recruiting';
+    }
+
+    function clampTrust(n){ return Math.max(0, Math.min(100, n)); }
+
+    function applyTrustDelta(g, memberId, delta) {
+        const m = (g.members || []).find(x => x.id === memberId);
+        if (m) m.trust = clampTrust((m.trust || 0) + delta);
+
+        if (memberId === user.id) {
+            user.trust = clampTrust(user.trust + delta);
+            updateTrust();
+        }
+
+        const el = document.getElementById(`ledger-trust-${memberId}`);
+        if (el && m) el.textContent = `Trust: ${m.trust}`;
+    }
+
+    function computeNextDueDate(freq) {
+        const d = new Date();
+        if (freq === "Daily") d.setDate(d.getDate() + 1);
+        else if (freq === "Weekly") d.setDate(d.getDate() + 7);
+        else d.setMonth(d.getMonth() + 1);
+        const opts = { year: 'numeric', month: 'short', day: 'numeric' };
+        return d.toLocaleDateString(undefined, opts);
+    }
+
+    function ensurePayoutOrder(g) {
+        g.payoutOrder = g.payoutOrder || [];
+        if (g.payoutOrder.length > g.max) g.payoutOrder = g.payoutOrder.slice(0, g.max);
+        while (g.payoutOrder.length < g.max) g.payoutOrder.push(null);
+    }
+
+    function assignMemberToPayoutSlot(g, memberId) {
+        ensurePayoutOrder(g);
+        if (g.payoutOrder.includes(memberId)) return;
+        const idx = g.payoutOrder.findIndex(x => x === null);
+        if (idx === -1) return;
+        g.payoutOrder[idx] = memberId;
+    }
+
+    function ensureMemberUnique(g) {
+        const seen = new Set();
+        g.members = (g.members || []).filter(m => {
+            if (seen.has(m.id)) return false;
+            seen.add(m.id);
+            return true;
+        });
+    }
+
+    function getMyRequest(g) {
+        return (g.requests || []).find(r => r.userId === user.id && r.status === 'pending');
+    }
+
+    function maybeStartGroup(g) {
+        ensurePayoutOrder(g);
+        ensureMemberUnique(g);
+        if (g.started) return;
+        if (!isFull(g)) return;
+
+        g.started = true;
+        g.phase = 'reserve';
+        g.cycleMonth = 0;
+        g.status = 'Reserve Period (Deposit)';
+        g.deposit = g.deposit || {};
+        g.trustEvents = g.trustEvents || {};
+        g.nextDue = g.nextDue || {};
+        g.contributions = g.contributions || {};
+        g.payoutPaidOut = g.payoutPaidOut || {};
+        appendSystemMessage(g.id, `Circle is now full. Starting Security Deposit period (${g.frequency}). No new members can join.`);
+    }
+
+    function payoutForCurrentPeriod(g) {
+        if (g.phase !== 'cycle') return;
+        ensurePayoutOrder(g);
+        g.payoutPaidOut = g.payoutPaidOut || {};
+
+        const periodIndex = g.cycleMonth - 1;
+        const recipientId = g.payoutOrder[periodIndex];
+
+        if (!recipientId) {
+            appendSystemMessage(g.id, `Payout recipient slot for Turn ${g.cycleMonth} is empty (admin issue).`);
+            return;
+        }
+
+        if (!g.payoutPaidOut[recipientId]) {
+            g.payoutPaidOut[recipientId] = true;
+            const member = g.members.find(m => m.id === recipientId);
+            appendSystemMessage(g.id, `Pot paid out to ${member ? member.name : 'member'} for Turn ${g.cycleMonth}.`);
+        }
+    }
+
+    function maybeAdvancePhase(g) {
+        if (g.phase === 'reserve') {
+            const key = 'dep';
+            const allPaidDeposit = g.members.every(m => g.contributions[`${m.id}-${key}`] === 'paid');
+            if (allPaidDeposit) {
+                g.phase = 'cycle';
+                g.cycleMonth = 1;
+                g.status = `Cycle: Period 1/${g.max}`;
+                appendSystemMessage(g.id, `Deposit period completed. Cycle started (Period 1/${g.max}).`);
+            }
+        }
+
+        if (g.phase === 'cycle') {
+            const key = `m${g.cycleMonth}`;
+            const allSettled = g.members.every(m => {
+                const st = g.contributions[`${m.id}-${key}`];
+                return st === 'paid' || st === 'covered';
+            });
+
+            if (allSettled) {
+                payoutForCurrentPeriod(g);
+
+                if (g.cycleMonth < g.max) {
+                    g.cycleMonth += 1;
+                    g.status = `Cycle: Period ${g.cycleMonth}/${g.max}`;
+                    appendSystemMessage(g.id, `All contributions settled. Moved to Period ${g.cycleMonth}/${g.max}.`);
+                } else {
+                    g.phase = 'completed';
+                    g.status = 'Completed';
+                    appendSystemMessage(g.id, `Cycle completed. Unused deposits are refundable to members.`);
+                }
+            }
+        }
+    }
+
+    // --- DEMO DATA ---
+    const frequencies = ["Daily", "Weekly", "Monthly"];
+    function pickFreq(i){ return frequencies[i % frequencies.length]; }
+
+    const publicGroupTitles = [
+        "Makola Traders", "Kejetia Circle", "Osu Creatives", "Madina Savers", "Tema Port Workers",
+        "Kokomlemle Hustlers", "East Legon Network", "Adenta Family Susu", "Kasoa Builders", "Takoradi Oil & Gas",
+        "Koforidua Market", "Cape Coast Alumni", "Sunyani Farmers", "Tamale Entrepreneurs", "Ho Community Circle",
+        "Techiman Traders", "Axim Beach Crew", "Labadi Foodies", "Spintex Friends", "Legon Students"
+    ];
+
+    let publicGroups = publicGroupTitles.map((title, i) => {
+        const max = 5 + (i % 3);
+        const leaderId = `u-p-${i}`;
+        const members = [
+            { id: leaderId, name: 'Leader', trust: 95, role: 'Leader', paused: false },
+            { id: `u-m-${i}-1`, name: 'Member 1', trust: 100, role: 'Member', paused: false }
         ];
 
-        let publicGroups = publicGroupTitles.map((title, i) => ({
+        const payoutOrder = Array(max).fill(null);
+        payoutOrder[0] = leaderId;
+        payoutOrder[1] = `u-m-${i}-1`;
+
+        return {
             id: `pg-${i}`,
             name: title,
             amount: 50 + (i * 25),
-            max: 5 + (i % 3),
-            leaderId: `u-p-${i}`,
+            max,
+            leaderId,
+            frequency: pickFreq(i),
+            started: false,
+            phase: 'recruiting',
+            cycleMonth: 0,
             status: 'Recruiting',
             joined: false,
-            payoutOrder: Array.from({length: 5 + (i % 3)}, (_, j) => `u-m-${i}-${j}`),
-            members: [
-                { id: `u-p-${i}`, name: 'Leader', trust: 95, role: 'Leader' },
-                { id: `u-m-${i}-1`, name: 'Member 1', trust: 100, role: 'Member' }
-            ],
+            payoutOrder,
+            payoutPaidOut: {},
+            members,
+            deposit: {},
             contributions: {},
-            chat: [{ id: 'sys-' + i, sender: 'System', text: 'Group looking for trusted savers.', type: 'sys' }],
-            votes: [], requests: []
-        }));
+            trustEvents: {},
+            nextDue: {},
+            chat: [{ id: 'sys-' + i, sender: 'System', text: 'Circle is recruiting members. Request to join to get approved.', type: 'sys' }],
+            votes: [],
+            requests: []
+        };
+    });
 
-        let myGroups = [
-            {
-                id: 'g-1', name: 'Tech Savvy Circle', amount: 300, max: 6,
-                leaderId: 'u-2', status: 'Cycle: Month 5/6', joined: true,
-                payoutOrder: ['u-2', 'u-3', 'u-4', 'u-5', 'u-1', 'u-6'],
-                members: [
-                    { id: 'u-2', name: 'Kwame', trust: 98, role: 'Leader' },
-                    { id: 'u-1', name: 'Ama (You)', trust: 100, role: 'Member' },
-                    { id: 'u-3', name: 'Kojo', trust: 99, role: 'Member' },
-                    { id: 'u-4', name: 'Abena', trust: 95, role: 'Member' },
-                    { id: 'u-5', name: 'Yao', trust: 97, role: 'Member' },
-                    { id: 'u-6', name: 'Esi', trust: 94, role: 'Member' }
-                ],
-                contributions: { 'u-1-m5': 'paid', 'u-2-m5': 'paid', 'u-3-m5': 'paid', 'u-4-m5': 'paid' },
-                chat: [
-                    { id: 'sys-g1-1', sender: 'System', text: 'Scenario: 5 months in. You are next to be paid.', type: 'sys' },
-                    { id: 'msg-g1-1', sender: 'Kwame', text: 'Should we increase the pot for next cycle?', type: 'msg' },
-                    { id: 'v-1', type: 'vote', topic: 'Increase pot to $400 next cycle?', yes: ['u-2', 'u-3'], no: [], total: 6 }
-                ],
-                votes: [], requests: []
-            },
-            {
-                id: 'g-2', name: 'New Family Susu', amount: 150, max: 4,
-                leaderId: 'u-1', status: 'Reserve Month (New)', joined: true,
-                payoutOrder: ['u-1', 'u-8', 'u-9', 'u-10'],
-                members: [
-                    { id: 'u-1', name: 'Ama (You)', trust: 100, role: 'Leader' },
-                    { id: 'u-8', name: 'Fatou', trust: 100, role: 'Member' },
-                    { id: 'u-9', name: 'Samba', trust: 98, role: 'Member' },
-                    { id: 'u-10', name: 'Aisha', trust: 99, role: 'Member' }
-                ],
-                contributions: { 'u-1-m1': 'pending' },
-                chat: [{ id: 'sys-g2-1', sender: 'System', text: 'Scenario: Just started. Paying Security Reserve.', type: 'sys' }],
-                votes: [], requests: []
-            },
-            {
-                id: 'g-3', name: 'Venture Savers', amount: 500, max: 5,
-                leaderId: 'u-11', status: 'Issue: Default Alert', joined: true,
-                payoutOrder: ['u-11', 'u-12', 'u-13', 'u-1', 'u-15'],
-                members: [
-                    { id: 'u-11', name: 'John', trust: 100, role: 'Leader' },
-                    { id: 'u-12', name: 'Sarah', trust: 45, role: 'Member' },
-                    { id: 'u-13', name: 'Dave', trust: 99, role: 'Member' },
-                    { id: 'u-1', name: 'Ama (You)', trust: 100, role: 'Member' },
-                    { id: 'u-15', name: 'Boky', trust: 100, role: 'Member' }
-                ],
-                contributions: { 'u-12-m3': 'missed' },
-                chat: [
-                    { id: 'sys-g3-1', sender: 'System', text: 'Scenario: Default! Sarah missed payment. Escalation required.', type: 'sys' },
-                    { id: 'v-99', type: 'vote', topic: 'Should we pause Sarah and redistribute?', yes: ['u-11'], no: ['u-13'], total: 5 }
-                ],
-                votes: [], requests: []
-            },
-            {
-                id: 'g-ama-lead', name: 'Ama\'s Managed Circle', amount: 200, max: 8,
-                leaderId: 'u-1', status: 'Ama is Leader', joined: true,
-                payoutOrder: ['u-1', 'u-lead-2', 'u-lead-3', 'u-lead-4', 'u-lead-5'],
-                members: [
-                    { id: 'u-1', name: 'Ama (You)', trust: 100, role: 'Leader' },
-                    { id: 'u-lead-2', name: 'Peter', trust: 99, role: 'Member' },
-                    { id: 'u-lead-3', name: 'Grace', trust: 98, role: 'Member' }
-                ],
-                contributions: {},
-                chat: [{ id: 'sys-lead-1', sender: 'System', text: 'Scenario: You are the Leader. Manage your members below.', type: 'sys' }],
-                votes: [], 
-                requests: [
-                    { id: 'u-req-1', name: 'Bismark', trust: 88 },
-                    { id: 'u-req-2', name: 'Esther', trust: 96 }
-                ]
-            }
-        ];
+    let myGroups = [
+        {
+            id: 'g-2', name: 'New Family Susu', amount: 150, max: 4,
+            leaderId: 'u-1',
+            frequency: "Monthly",
+            started: false,
+            phase: 'recruiting',
+            cycleMonth: 0,
+            status: 'Recruiting',
+            joined: true,
+            payoutOrder: ['u-1','u-8','u-9',null],
+            payoutPaidOut: {},
+            members: [
+                { id: 'u-1', name: 'Ama (You)', trust: 100, role: 'Leader', paused: false },
+                { id: 'u-8', name: 'Fatou', trust: 100, role: 'Member', paused: false },
+                { id: 'u-9', name: 'Samba', trust: 98, role: 'Member', paused: false }
+            ],
+            deposit: {},
+            contributions: {},
+            trustEvents: {},
+            nextDue: {},
+            chat: [{ id: 'sys-g2-1', sender: 'System', text: 'Recruiting: request-to-join enabled. Circle starts only when full.', type: 'sys' }],
+            votes: [],
+            requests: [
+                { id: 'rq-1', userId: 'u-10', name: 'Kofi', status: 'pending', ts: Date.now() - 100000 }
+            ]
+        },
 
-        let groups = [...myGroups, ...publicGroups];
-        let activeTab = 'explore';
-        let currentGroupId = null;
+        {
+            id: 'g-1',
+            name: 'Tech Savvy Circle',
+            amount: 300,
+            max: 6,
+            leaderId: 'u-22',
+            frequency: "Monthly",
+            started: true,
+            phase: 'cycle',
+            cycleMonth: 5,
+            status: 'Cycle: Period 5/6',
+            joined: true,
+            payoutOrder: ['u-22','u-23','u-24','u-25','u-1','u-26'],
+            payoutPaidOut: { 'u-22': true, 'u-23': true, 'u-24': true, 'u-25': true },
+            members: [
+                { id: 'u-22', name: 'Kwame', trust: 98, role: 'Leader', paused: false },
+                { id: 'u-1',  name: 'Ama (You)', trust: 100, role: 'Member', paused: false },
+                { id: 'u-23', name: 'Kojo', trust: 99, role: 'Member', paused: false },
+                { id: 'u-24', name: 'Abena', trust: 95, role: 'Member', paused: false },
+                { id: 'u-25', name: 'Yao', trust: 97, role: 'Member', paused: false },
+                { id: 'u-26', name: 'Esi', trust: 94, role: 'Member', paused: false }
+            ],
+            deposit: {
+                'u-1': { available: true, used: false },
+                'u-22': { available: true, used: false },
+                'u-23': { available: true, used: false },
+                'u-24': { available: true, used: false },
+                'u-25': { available: true, used: false },
+                'u-26': { available: true, used: false }
+            },
+            contributions: {
+                'u-22-m5': 'paid',
+                'u-23-m5': 'paid',
+                'u-24-m5': 'paid',
+                'u-25-m5': 'paid'
+            },
+            trustEvents: {},
+            nextDue: { 'u-1': computeNextDueDate("Monthly") },
+            chat: [
+                { id: 'sys-g1-1', sender: 'System', text: 'Scenario: You are yet to pay for this period. Pay to keep the cycle moving.', type: 'sys' },
+                { id: 'msg-g1-2', sender: 'Kwame', text: 'Reminder: Please settle Period 5 so we can pay out Turn 5.', type: 'msg' }
+            ],
+            votes: [],
+            requests: []
+        }
+    ];
 
-        // --- NAVIGATION ---
-        function showView(id) {
-            document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
-            document.getElementById(`view-${id}`).classList.add('active');
-            if (id === 'dashboard') renderGroups();
-            window.scrollTo(0,0);
+    let groups = [...myGroups, ...publicGroups];
+    groups.forEach(g => ensurePayoutOrder(g));
+
+    // --- NAVIGATION ---
+    function showView(id) {
+        document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
+        document.getElementById(`view-${id}`).classList.add('active');
+        if (id === 'dashboard') renderGroups();
+        window.scrollTo(0,0);
+    }
+
+    function toggleTabs(tab) {
+        activeTab = tab;
+        const exp = document.getElementById('tab-explore');
+        const joi = document.getElementById('tab-joined');
+        if (tab === 'explore') {
+            exp.className = "px-6 py-2 rounded-md text-sm font-black transition-all bg-white shadow-sm text-indigo-700";
+            joi.className = "px-6 py-2 rounded-md text-sm font-black transition-all text-slate-700";
+        } else {
+            joi.className = "px-6 py-2 rounded-md text-sm font-black transition-all bg-white shadow-sm text-indigo-700";
+            exp.className = "px-6 py-2 rounded-md text-sm font-black transition-all text-slate-700";
+        }
+        renderGroups();
+    }
+
+    function groupHasIssueHint(g) {
+        return (g.phase === 'cycle') && (g.members || []).some(m => (m.trust || 0) < 60);
+    }
+
+    function matchesSearch(g) {
+        if (!searchQuery) return true;
+        const q = searchQuery.toLowerCase();
+        const code = inviteCodeFromGroupId(g.id).toLowerCase();
+        const name = (g.name || "").toLowerCase();
+        return name.includes(q) || code.includes(q);
+    }
+
+    function myMembershipState(g) {
+        if (g.joined) return 'member';
+        const rq = getMyRequest(g);
+        if (rq) return 'requested';
+        return 'none';
+    }
+
+    // --- RENDER GROUPS ---
+    function renderGroups() {
+        const grid = document.getElementById('groups-grid');
+        const filterVal = (document.getElementById('freq-filter')?.value || "all");
+
+        const filtered = groups
+            .filter(g => activeTab === 'joined' ? g.joined : !g.joined)
+            .filter(g => filterVal === "all" ? true : (g.frequency === filterVal))
+            .filter(g => matchesSearch(g));
+
+        if (filtered.length === 0) {
+            grid.innerHTML = `
+                <div class="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm md:col-span-2 lg:col-span-3">
+                    <h3 class="text-2xl font-black mb-2 text-slate-900">No circles match your filters</h3>
+                    <p class="text-slate-700 font-semibold mb-6">Try a different search term or frequency.</p>
+                    <button onclick="showView('create')" class="bg-indigo-600 text-white px-6 py-3 rounded-xl font-black text-sm">Create a Circle</button>
+                </div>
+            `;
+            return;
         }
 
-        function toggleTabs(tab) {
-            activeTab = tab;
-            const exp = document.getElementById('tab-explore');
-            const joi = document.getElementById('tab-joined');
-            if (tab === 'explore') {
-                exp.className = "px-6 py-2 rounded-md text-xs font-black transition-all bg-white shadow-sm text-indigo-600";
-                joi.className = "px-6 py-2 rounded-md text-xs font-black transition-all text-slate-500";
-            } else {
-                joi.className = "px-6 py-2 rounded-md text-xs font-black transition-all bg-white shadow-sm text-indigo-600";
-                exp.className = "px-6 py-2 rounded-md text-xs font-black transition-all text-slate-500";
-            }
-            renderGroups();
-        }
+        grid.innerHTML = filtered.map(g => {
+            ensurePayoutOrder(g);
+            ensureMemberUnique(g);
 
-        // --- RENDERERS ---
-        function renderGroups() {
-            const grid = document.getElementById('groups-grid');
-            const filtered = groups.filter(g => activeTab === 'joined' ? g.joined : !g.joined);
-            
-            grid.innerHTML = filtered.map(g => `
+            const membership = myMembershipState(g);
+            const canRequest = (!g.joined && !isStarted(g) && !isFull(g) && membership === 'none');
+            const requestDisabled = (!canRequest);
+
+            const btnText = g.joined
+                ? (g.leaderId === user.id ? 'Manage as Leader' : 'Enter Dashboard')
+                : (isStarted(g) ? "Closed (Started)" : (isFull(g) ? "Full" : (membership === 'requested' ? 'Requested' : 'Request to Join')));
+
+            const btnClass = g.joined
+                ? (g.leaderId === user.id ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-white')
+                : (requestDisabled ? 'bg-slate-200 text-slate-600 cursor-not-allowed' : 'border-2 border-indigo-50 text-indigo-700 hover:bg-indigo-50');
+
+            const roleBadge = g.joined
+                ? (g.leaderId === user.id
+                    ? `<span class="text-[10px] font-black bg-amber-50 text-amber-800 px-3 py-1 rounded-full border border-amber-100 uppercase tracking-wider">Leader</span>`
+                    : `<span class="text-[10px] font-black bg-slate-100 text-slate-800 px-3 py-1 rounded-full border border-slate-200 uppercase tracking-wider">Member</span>`
+                )
+                : `<span class="text-[10px] font-black bg-white/60 text-slate-700 px-3 py-1 rounded-full border border-slate-200 uppercase tracking-wider">Public</span>`;
+
+            const iconClass = groupHasIssueHint(g)
+                ? 'fa-exclamation-triangle text-amber-200'
+                : (g.joined && g.leaderId === user.id
+                    ? 'fa-crown text-amber-200'
+                    : (isStarted(g) ? 'fa-lock text-amber-200' : 'fa-users')
+                );
+
+            const statusPillClass = groupHasIssueHint(g)
+                ? 'bg-amber-50 text-amber-800'
+                : (isStarted(g) ? 'bg-slate-100 text-slate-700' : 'bg-emerald-50 text-emerald-700');
+
+            const inviteCode = inviteCodeFromGroupId(g.id);
+
+            return `
                 <div class="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all">
                     <div class="flex justify-between items-start mb-6">
                         <div class="w-10 h-10 rosa-gradient text-white rounded-xl flex items-center justify-center text-sm font-bold shadow-md">
-                            <i class="fas ${g.status.includes('Issue') ? 'fa-exclamation-triangle text-amber-300' : (g.leaderId === user.id ? 'fa-crown text-amber-300' : 'fa-rotate')}"></i>
+                            <i class="fas ${iconClass}"></i>
                         </div>
-                        <span class="text-[9px] font-black px-2 py-1 ${g.status.includes('Issue') ? 'bg-red-50 text-red-500' : 'bg-slate-100 text-slate-500'} rounded-full uppercase">${g.status}</span>
+                        <div class="flex items-center gap-2">
+                            ${roleBadge}
+                            <span class="text-[10px] font-black px-3 py-1 ${statusPillClass} rounded-full uppercase tracking-wider">
+                                ${statusLabel(g)}
+                            </span>
+                        </div>
                     </div>
-                    <h3 class="text-xl font-black mb-1">${g.name}</h3>
-                    <p class="text-xs text-slate-400 font-bold mb-6">$${g.amount}/mo • $${g.amount * g.max} Pot</p>
-                    
+
+                    <h3 class="text-xl font-black mb-1 text-slate-900">${g.name}</h3>
+                    <p class="text-sm text-slate-700 font-semibold mb-2">${fmt(g.amount)} / ${g.frequency}</p>
+                    <p class="text-sm text-slate-700 font-semibold mb-4">${fmt(g.amount * g.max)} Pot • ${(g.members || []).length}/${g.max} Members</p>
+
+                    <div class="bg-slate-50 border border-slate-100 rounded-2xl p-4 mb-6">
+                        <p class="text-[10px] font-black text-slate-700 uppercase tracking-widest mb-1">Invite Code</p>
+                        <div class="flex items-center justify-between gap-3">
+                            <p class="text-sm font-black text-slate-900">${inviteCode}</p>
+                            <button onclick="copyInviteCode('${inviteCode}')" class="bg-white border border-slate-200 px-3 py-2 rounded-xl text-[10px] font-black text-slate-800 hover:bg-slate-100 transition-all">
+                                Copy
+                            </button>
+                        </div>
+                        <p class="text-[11px] text-slate-600 font-semibold mt-2">
+                            Search this code to find the circle quickly.
+                        </p>
+                    </div>
+
                     <div class="flex items-center justify-between mb-8">
                         <div class="flex -space-x-2">
-                            ${g.members.slice(0, 4).map(m => `<div class="w-7 h-7 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[9px] font-bold text-slate-400">${m.name[0]}</div>`).join('')}
-                            ${g.members.length > 4 ? `<div class="w-7 h-7 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center text-[8px] font-bold">+${g.members.length - 4}</div>` : ''}
+                            ${(g.members || []).slice(0, 4).map(m => `<div class="w-7 h-7 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[10px] font-black text-slate-700">${m.name[0]}</div>`).join('')}
+                            ${(g.members || []).length > 4 ? `<div class="w-7 h-7 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center text-[10px] font-black text-slate-800">+${g.members.length - 4}</div>` : ''}
                         </div>
-                        <span class="text-[9px] font-black text-slate-400 uppercase tracking-tighter">${g.members.length}/${g.max} Members</span>
+                        <span class="text-[10px] font-black text-slate-700 uppercase tracking-wider">${g.frequency}</span>
                     </div>
 
-                    <button onclick="${g.joined ? `openGroup('${g.id}')` : `requestJoin('${g.id}')`}" class="w-full py-4 ${g.joined ? (g.leaderId === user.id ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-white') : 'border-2 border-indigo-50 text-indigo-600'} rounded-xl font-black text-xs hover:scale-[1.02] transition-all">
-                        ${g.joined ? (g.leaderId === user.id ? 'Manage as Leader' : 'Enter Dashboard') : 'Request to Join'}
+                    <button
+                        onclick="${
+                            g.joined
+                                ? `openGroup('${g.id}')`
+                                : (canRequest ? `requestToJoin('${g.id}')` : 'return;')
+                        }"
+                        class="w-full py-4 ${btnClass} rounded-xl font-black text-sm hover:scale-[1.02] transition-all">
+                        ${btnText}
                     </button>
                 </div>
-            `).join('');
+            `;
+        }).join('');
+    }
+
+    // --- REQUEST TO JOIN ---
+    function requestToJoin(gid) {
+        const g = groups.find(x => x.id === gid);
+        if (!g) return;
+
+        if (isStarted(g)) return toast("This circle has started. Joining is closed.");
+        if (isFull(g)) return toast("This circle is full.");
+        if (g.joined) return toast("You are already a member.");
+
+        g.requests = g.requests || [];
+        if (getMyRequest(g)) return toast("You already requested to join.");
+
+        const req = {
+            id: 'rq-' + Date.now(),
+            userId: user.id,
+            name: user.name,
+            status: 'pending',
+            ts: Date.now()
+        };
+        g.requests.push(req);
+
+        appendSystemMessage(g.id, `${user.name} requested to join. Waiting for leader approval.`);
+        toast("Request sent to leader.");
+        renderGroups();
+    }
+
+    function approveRequest(gid, reqId) {
+        const g = groups.find(x => x.id === gid);
+        if (!g) return;
+
+        const isLeader = (g.leaderId === user.id);
+        if (!isLeader) return toast("Only the leader can approve requests.");
+
+        const req = (g.requests || []).find(r => r.id === reqId);
+        if (!req || req.status !== 'pending') return;
+
+        if (isStarted(g)) {
+            req.status = 'rejected';
+            appendSystemMessage(g.id, `Request rejected (circle already started).`);
+            toast("Cannot approve: circle already started.");
+            openGroup(gid);
+            return;
         }
 
-        function openGroup(id) {
-            currentGroupId = id;
-            const g = groups.find(x => x.id === id);
-            const isLeader = g.leaderId === user.id;
-            const container = document.getElementById('detail-content');
-            
-            container.innerHTML = `
-                <div class="grid lg:grid-cols-12 gap-8">
-                    <!-- Left: Ledger & Payout -->
-                    <div class="lg:col-span-8 space-y-8">
-                        <!-- Request Banner if Leader -->
-                        ${isLeader && g.requests.length > 0 ? `
-                        <div class="bg-indigo-600 p-8 rounded-[2.5rem] text-white shadow-xl shadow-indigo-100 mb-8 animate-slide-up">
-                            <h4 class="text-lg font-black mb-4 flex items-center gap-2"><i class="fas fa-user-plus"></i> Pending Join Requests</h4>
-                            <div class="grid md:grid-cols-2 gap-4">
-                                ${g.requests.map(req => `
-                                    <div id="req-${req.id}" class="bg-white/10 p-4 rounded-2xl flex items-center justify-between">
-                                        <div>
-                                            <p class="font-bold text-sm">${req.name}</p>
-                                            <p class="text-[10px] font-black text-emerald-300">Trust: ${req.trust}</p>
-                                        </div>
-                                        <div class="flex gap-2">
-                                            <button onclick="handleRequest('${g.id}', '${req.id}', true)" class="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center"><i class="fas fa-check text-[10px]"></i></button>
-                                            <button onclick="handleRequest('${g.id}', '${req.id}', false)" class="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center"><i class="fas fa-times text-[10px]"></i></button>
-                                        </div>
+        if (isFull(g)) {
+            req.status = 'rejected';
+            appendSystemMessage(g.id, `Request rejected (circle already full).`);
+            toast("Cannot approve: circle full.");
+            openGroup(gid);
+            return;
+        }
+
+        g.members = g.members || [];
+        const exists = g.members.some(m => m.id === req.userId);
+        if (!exists) {
+            g.members.push({ id: req.userId, name: req.name, trust: 100, role: 'Member', paused: false });
+            assignMemberToPayoutSlot(g, req.userId);
+        }
+
+        req.status = 'approved';
+        appendSystemMessage(g.id, `${req.name} approved and added to the circle.`);
+
+        if (req.userId === user.id) g.joined = true;
+
+        if (isFull(g)) maybeStartGroup(g);
+
+        toast("Request approved.");
+        openGroup(gid);
+        renderGroups();
+    }
+
+    function rejectRequest(gid, reqId) {
+        const g = groups.find(x => x.id === gid);
+        if (!g) return;
+
+        const isLeader = (g.leaderId === user.id);
+        if (!isLeader) return toast("Only the leader can reject requests.");
+
+        const req = (g.requests || []).find(r => r.id === reqId);
+        if (!req || req.status !== 'pending') return;
+
+        req.status = 'rejected';
+        appendSystemMessage(g.id, `Request rejected for ${req.name}.`);
+        toast("Request rejected.");
+        openGroup(gid);
+        renderGroups();
+    }
+
+    // --- GROUP DETAIL VIEW ---
+    function openGroup(id) {
+        currentGroupId = id;
+        const g = groups.find(x => x.id === id);
+        if (!g) return;
+
+        ensurePayoutOrder(g);
+        ensureMemberUnique(g);
+
+        const isLeader = g.leaderId === user.id;
+        const container = document.getElementById('detail-content');
+
+        maybeStartGroup(g);
+
+        const inviteCode = inviteCodeFromGroupId(g.id);
+        const key = currentPeriodKey(g);
+
+        const myPayStatus = g.contributions?.[`${user.id}-${key}`] || 'pending';
+        const alreadySettled = (myPayStatus === 'paid' || myPayStatus === 'covered');
+
+        const payBtnClass = alreadySettled
+            ? "w-full py-4 bg-slate-200 text-slate-600 rounded-xl font-black text-sm cursor-not-allowed"
+            : "w-full py-4 bg-emerald-500 text-white rounded-xl font-black text-sm hover:bg-emerald-600 transition-all";
+
+        const payBtnText = alreadySettled
+            ? `Paid (${fmt(g.amount)})`
+            : (g.phase === 'reserve' ? `Pay Security Deposit (${fmt(g.amount)})` : `Make Payment (${fmt(g.amount)})`);
+
+        const payBtnOnclick = alreadySettled ? "return;" : `makePayment('${g.id}')`;
+
+        const joinLockText = isStarted(g)
+            ? "Circle has started. No new members can join."
+            : (isFull(g) ? "Circle is full and will start now." : "Circle is recruiting. Request to join and wait for leader approval.");
+
+        const depositAvailableCount = Object.values(g.deposit || {}).filter(v => v && v.available && !v.used).length;
+        const depositUsedCount = Object.values(g.deposit || {}).filter(v => v && v.used).length;
+
+        const nextDueText = g.nextDue?.[user.id] ? g.nextDue[user.id] : "";
+
+        const myTurnIndex = (g.payoutOrder || []).findIndex(x => x === user.id);
+        const myTurn = myTurnIndex >= 0 ? (myTurnIndex + 1) : null;
+        const iWasPaidOut = !!(g.payoutPaidOut && g.payoutPaidOut[user.id]);
+
+        const pendingReqs = (g.requests || []).filter(r => r.status === 'pending');
+
+        container.innerHTML = `
+            <div class="grid lg:grid-cols-12 gap-8">
+                <div class="lg:col-span-8 space-y-8">
+                    <div class="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm">
+                        <div class="flex flex-wrap items-start justify-between gap-4 mb-8">
+                            <div>
+                                <h2 class="text-3xl font-black text-slate-900">${g.name} ${isLeader ? '👑' : ''}</h2>
+                                <p class="text-[11px] font-black text-slate-700 mt-1 uppercase tracking-widest">${statusLabel(g)} • ${g.frequency}</p>
+
+                                <div class="mt-4 bg-slate-50 border border-slate-100 rounded-2xl p-4">
+                                    <p class="text-[10px] font-black text-slate-700 uppercase tracking-widest mb-1">Invite Code (share this)</p>
+                                    <div class="flex items-center justify-between gap-3">
+                                        <p class="text-lg font-black text-slate-900">${inviteCode}</p>
+                                        <button onclick="copyInviteCode('${inviteCode}')" class="bg-white border border-slate-200 px-4 py-2 rounded-xl text-sm font-black text-slate-800 hover:bg-slate-100 transition-all">
+                                            Copy
+                                        </button>
                                     </div>
-                                `).join('')}
+                                    <p class="text-[11px] text-slate-600 font-semibold mt-2">
+                                        ${joinLockText}
+                                        <span class="block mt-1">Use invite code search on the dashboard to find this circle instantly.</span>
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="bg-indigo-50 px-6 py-4 rounded-2xl flex items-center gap-4">
+                                <div>
+                                    <p class="text-[10px] font-black text-indigo-700 uppercase mb-1 tracking-wider">Pot Size</p>
+                                    <p class="text-2xl font-black text-indigo-700">${fmt(g.amount * g.max)}</p>
+                                </div>
+                                <div class="border-l border-indigo-200 pl-4">
+                                    <p class="text-[10px] font-black text-indigo-700 uppercase mb-1 tracking-wider">Contribution</p>
+                                    <p class="text-lg font-black text-indigo-950">${fmt(g.amount)} / ${g.frequency}</p>
+                                </div>
                             </div>
                         </div>
-                        ` : ''}
 
-                        <div class="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm">
-                            <div class="flex flex-wrap items-start justify-between gap-4 mb-10">
-                                <div>
-                                    <h2 class="text-3xl font-black">${g.name} ${isLeader ? '👑' : ''}</h2>
-                                    <p class="text-[10px] font-black text-slate-400 mt-1 uppercase tracking-widest">${g.status}</p>
+                        <div class="bg-amber-50 border border-amber-100 rounded-2xl p-5 mb-10">
+                            <p class="text-[11px] font-black text-amber-800 uppercase tracking-widest mb-2">Security Deposit Rule</p>
+                            <p class="text-sm font-semibold text-amber-900 leading-relaxed">
+                                Each member pays <span class="font-black">${fmt(g.amount)}</span> once during the first period as a refundable deposit.
+                                If a member misses a payment later, their own deposit can cover them <span class="font-black">once</span>.
+                                Unused deposits are refundable at the end.
+                            </p>
+                            <div class="mt-3 flex flex-wrap gap-2">
+                                <span class="text-[11px] font-black bg-white px-3 py-2 rounded-xl border border-amber-100 text-amber-900">Deposits available: ${depositAvailableCount}</span>
+                                <span class="text-[11px] font-black bg-white px-3 py-2 rounded-xl border border-amber-100 text-amber-900">Deposits used: ${depositUsedCount}</span>
+                            </div>
+                        </div>
+
+                        <div class="grid md:grid-cols-2 gap-10">
+                            <div>
+                                <h4 class="text-[11px] font-black text-slate-700 uppercase tracking-widest mb-4">Payout Order (green = already paid out)</h4>
+                                <div class="space-y-2">
+                                    ${(g.payoutOrder || []).map((uid, i) => {
+                                        const turn = i + 1;
+                                        const member = uid ? g.members.find(mx => mx.id === uid) : null;
+                                        const name = member ? member.name : 'Open Slot';
+
+                                        const paidOut = uid && g.payoutPaidOut && g.payoutPaidOut[uid];
+                                        const isCurrentTurn = (g.phase === 'cycle' && g.cycleMonth === turn);
+                                        const isMe = uid === user.id;
+
+                                        const base = paidOut
+                                            ? "bg-emerald-500 text-white shadow-lg"
+                                            : (isCurrentTurn
+                                                ? "bg-amber-200 text-amber-950"
+                                                : "bg-slate-50 text-slate-800"
+                                              );
+
+                                        const meRing = isMe ? "ring-2 ring-indigo-500" : "";
+
+                                        const rightLabel = paidOut
+                                            ? "Paid Out"
+                                            : (isCurrentTurn
+                                                ? "Receiving Now"
+                                                : (uid ? "Upcoming" : "Empty")
+                                              );
+
+                                        return `
+                                            <div class="flex items-center justify-between p-3 ${base} rounded-xl ${meRing}">
+                                                <span class="text-sm font-black">${turn}. ${name} ${isMe ? '(You)' : ''}</span>
+                                                <span class="text-[11px] font-black opacity-80">${rightLabel}</span>
+                                            </div>
+                                        `;
+                                    }).join('')}
                                 </div>
-                                <div class="bg-indigo-50 px-6 py-4 rounded-2xl flex items-center gap-4">
-                                    <div>
-                                        <p class="text-[9px] font-black text-indigo-400 uppercase mb-1">Pot Size</p>
-                                        <p class="text-2xl font-black text-indigo-600">$${g.amount * g.max}</p>
-                                    </div>
-                                    <div class="border-l border-indigo-200 pl-4">
-                                        <p class="text-[9px] font-black text-indigo-400 uppercase mb-1">Contribution</p>
-                                        <p class="text-lg font-black text-indigo-900">$${g.amount}</p>
-                                    </div>
+
+                                <div class="mt-5 bg-slate-50 border border-slate-100 rounded-2xl p-4">
+                                    <p class="text-[10px] font-black text-slate-700 uppercase tracking-widest mb-1">Your payout status</p>
+                                    ${
+                                        myTurn
+                                            ? `<p class="text-sm font-black text-slate-900">Turn ${myTurn} • ${iWasPaidOut ? '<span class="text-emerald-700">Already paid out</span>' : '<span class="text-amber-700">Yet to be paid out</span>'}</p>`
+                                            : `<p class="text-sm font-black text-slate-900">Not assigned yet (you may be waiting approval / slot).</p>`
+                                    }
                                 </div>
                             </div>
 
-                            <div class="grid md:grid-cols-2 gap-10">
-                                <div>
-                                    <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Payout Order</h4>
-                                    <div class="space-y-2">
-                                        ${g.payoutOrder.map((uid, i) => {
-                                            const m = g.members.find(mx => mx.id === uid) || { name: 'Empty Slot' };
-                                            const isPaid = i < parseInt(g.status.match(/\d+/) || 0);
-                                            return `
-                                                <div class="flex items-center justify-between p-3 ${uid === user.id ? 'bg-indigo-600 text-white shadow-lg' : (isPaid ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-50')} rounded-xl">
-                                                    <span class="text-xs font-bold">${i+1}. ${m.name} ${isPaid ? '✓' : ''}</span>
-                                                    <span class="text-[10px] opacity-60">Turn ${i+1}</span>
-                                                </div>
-                                            `;
-                                        }).join('')}
-                                    </div>
-                                </div>
-                                <div>
-                                    <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Live Ledger</h4>
-                                    <div class="space-y-4">
-                                        ${g.members.map(m => {
-                                            const monthKey = g.status.includes('5/6') ? 'm5' : 'm1';
-                                            const status = g.contributions[`${m.id}-${monthKey}`] || (m.trust < 60 ? 'missed' : 'pending');
-                                            return `
-                                                <div class="flex items-center justify-between border-b border-slate-50 pb-3" id="ledger-row-${m.id}">
-                                                    <div class="flex items-center gap-2">
-                                                        <div class="w-7 h-7 bg-slate-100 rounded text-[10px] font-bold flex items-center justify-center">${m.name[0]}</div>
-                                                        <div class="text-xs font-bold">${m.name} <p id="ledger-trust-${m.id}" class="text-[8px] text-emerald-500">Trust: ${m.trust}</p></div>
+                            <div>
+                                <h4 class="text-[11px] font-black text-slate-700 uppercase tracking-widest mb-4">Live Ledger (payment status this period)</h4>
+                                <div class="space-y-4">
+                                    ${g.members.map(m => {
+                                        const st = resolveMemberStatus(g, m.id);
+                                        const pausedBadge = m.paused ? `<span class="ml-2 text-[10px] font-black bg-amber-100 text-amber-900 px-2 py-1 rounded-full">PAUSED</span>` : '';
+                                        return `
+                                            <div class="flex items-center justify-between border-b border-slate-50 pb-3" id="ledger-row-${m.id}">
+                                                <div class="flex items-center gap-2">
+                                                    <div class="w-7 h-7 bg-slate-100 rounded text-[11px] font-black flex items-center justify-center text-slate-800">${m.name[0]}</div>
+                                                    <div class="text-sm font-black text-slate-900">${m.name} ${pausedBadge}
+                                                        <p id="ledger-trust-${m.id}" class="text-[11px] text-emerald-700 font-black tracking-wider">Trust: ${m.trust}</p>
                                                     </div>
-                                                    <span id="ledger-status-${m.id}" class="status-pill status-${status}">${status}</span>
                                                 </div>
-                                            `;
-                                        }).join('')}
-                                    </div>
+                                                <span id="ledger-status-${m.id}" class="status-pill status-${st}">${st}</span>
+                                            </div>
+                                        `;
+                                    }).join('')}
                                 </div>
+
+                                ${
+                                    isLeader ? `
+                                        <div class="mt-8 bg-white border border-slate-100 rounded-2xl p-5">
+                                            <div class="flex items-center justify-between mb-3">
+                                                <p class="text-[11px] font-black text-slate-700 uppercase tracking-widest">Join Requests</p>
+                                                <span class="text-[10px] font-black bg-slate-100 text-slate-700 px-3 py-1 rounded-full border border-slate-200 uppercase tracking-wider">${pendingReqs.length} Pending</span>
+                                            </div>
+
+                                            ${
+                                                pendingReqs.length === 0
+                                                    ? `<p class="text-sm font-semibold text-slate-600">No pending requests right now.</p>`
+                                                    : `<div class="space-y-3">
+                                                        ${pendingReqs.map(r => `
+                                                            <div class="flex items-center justify-between bg-slate-50 border border-slate-100 rounded-xl p-4">
+                                                                <div>
+                                                                    <p class="text-sm font-black text-slate-900">${r.name}</p>
+                                                                    <p class="text-[11px] font-semibold text-slate-600">Requested to join</p>
+                                                                </div>
+                                                                <div class="flex gap-2">
+                                                                    <button onclick="rejectRequest('${g.id}','${r.id}')" class="px-4 py-2 rounded-xl bg-red-50 text-red-700 border border-red-100 text-[11px] font-black hover:bg-red-100">Reject</button>
+                                                                    <button onclick="approveRequest('${g.id}','${r.id}')" class="px-4 py-2 rounded-xl bg-emerald-500 text-white text-[11px] font-black hover:bg-emerald-600">Approve</button>
+                                                                </div>
+                                                            </div>
+                                                        `).join('')}
+                                                    </div>`
+                                            }
+                                        </div>
+                                    ` : ``
+                                }
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <!-- Right: Interaction -->
-                    <div class="lg:col-span-4 space-y-6">
-                        <div class="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col h-[500px]">
-                            <div class="p-4 border-b border-slate-50 flex justify-between items-center">
-                                <span class="text-[9px] font-black text-slate-400 uppercase">Circle Feed</span>
-                                <button onclick="openVoteModal('${g.id}')" class="text-[8px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded uppercase hover:bg-indigo-100 transition-colors">Start Vote</button>
+                <!-- Right -->
+                <div class="lg:col-span-4 space-y-6">
+                    <div class="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col h-[500px]">
+                        <div class="p-4 border-b border-slate-50 flex justify-between items-center">
+                            <span class="text-[11px] font-black text-slate-700 uppercase tracking-widest">Circle Feed</span>
+                            <div class="flex items-center gap-2">
+                                ${isLeader ? `
+                                    <button onclick="openLeaderActionModal('${g.id}')" class="text-[10px] font-black text-slate-800 bg-slate-100 px-3 py-2 rounded uppercase hover:bg-slate-200 transition-colors">
+                                        Leader Actions
+                                    </button>
+                                ` : ''}
+                                <button onclick="openVoteModal('${g.id}')" class="text-[10px] font-black text-indigo-700 bg-indigo-50 px-3 py-2 rounded uppercase hover:bg-indigo-100 transition-colors">
+                                    Start Vote
+                                </button>
                             </div>
-                            <div id="chat-box" class="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar">
-                                ${g.chat.map(m => {
-                                    if (m.type === 'vote') {
-                                        const totalVotes = m.yes.length + m.no.length;
-                                        const pct = Math.min(100, (totalVotes / m.total) * 100);
-                                        return `
-                                            <div id="chat-item-${m.id}" class="bg-slate-50 border border-slate-100 p-4 rounded-2xl animate-slide-up">
-                                                <div class="flex justify-between items-start mb-2">
-                                                    <p class="text-[10px] font-black text-slate-400 uppercase">Community Vote</p>
-                                                    <i class="fas fa-poll text-indigo-300"></i>
-                                                </div>
-                                                <p class="text-xs font-bold mb-3 leading-relaxed">${m.topic}</p>
-                                                <div class="flex gap-2 mb-3">
-                                                    <button id="vote-yes-btn-${m.id}" onclick="castVote('${g.id}', '${m.id}', 'yes')" class="flex-1 py-2 rounded-lg text-[10px] font-black transition-all ${m.yes.includes(user.id) ? 'bg-emerald-500 text-white' : 'bg-white border border-slate-200 text-slate-400 hover:border-emerald-200'}">YES (<span id="vote-yes-count-${m.id}">${m.yes.length}</span>)</button>
-                                                    <button id="vote-no-btn-${m.id}" onclick="castVote('${g.id}', '${m.id}', 'no')" class="flex-1 py-2 rounded-lg text-[10px] font-black transition-all ${m.no.includes(user.id) ? 'bg-red-500 text-white' : 'bg-white border border-slate-200 text-slate-400 hover:border-red-200'}">NO (<span id="vote-no-count-${m.id}">${m.no.length}</span>)</button>
-                                                </div>
-                                                <div class="w-full bg-slate-200 h-1 rounded-full overflow-hidden">
-                                                    <div id="vote-progress-${m.id}" class="bg-indigo-500 h-full transition-all duration-500" style="width: ${pct}%"></div>
-                                                </div>
-                                            </div>
-                                        `;
-                                    }
-                                    if (m.type === 'sys') {
-                                        const sid = m.id || ("sys-" + Math.random().toString(16).slice(2));
-                                        return `
-                                            <div id="chat-item-${sid}" class="text-center">
-                                                <span class="bg-slate-50 text-slate-400 px-3 py-1 rounded-full text-[8px] font-black uppercase">${m.text}</span>
-                                            </div>
-                                        `;
-                                    }
-                                    const mid = m.id || ("msg-" + Math.random().toString(16).slice(2));
-                                    const isMe = m.sender.includes('Ama');
+                        </div>
+                        <div id="chat-box" class="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar">
+                            ${(g.chat || []).map(m => {
+                                if (m.type === 'vote') {
+                                    const totalVotes = m.yes.length + m.no.length;
+                                    const pct = Math.min(100, (totalVotes / m.total) * 100);
                                     return `
-                                        <div id="chat-item-${mid}" class="flex flex-col ${isMe ? 'items-end' : 'items-start'}">
-                                            <div class="p-3 rounded-xl text-[11px] font-medium ${isMe ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-600'}">
-                                                ${m.text}
+                                        <div id="chat-item-${m.id}" class="bg-slate-50 border border-slate-100 p-4 rounded-2xl animate-slide-up">
+                                            <div class="flex justify-between items-start mb-2">
+                                                <p class="text-[11px] font-black text-slate-700 uppercase tracking-widest">Community Vote</p>
+                                                <i class="fas fa-poll text-indigo-400"></i>
+                                            </div>
+                                            <p class="text-sm font-black mb-3 leading-relaxed text-slate-900">${m.topic}</p>
+                                            <div class="flex gap-2 mb-3">
+                                                <button onclick="castVote('${g.id}', '${m.id}', 'yes')" class="flex-1 py-2 rounded-lg text-[11px] font-black transition-all ${m.yes.includes(user.id) ? 'bg-emerald-500 text-white' : 'bg-white border border-slate-200 text-slate-700 hover:border-emerald-200'}">YES (${m.yes.length})</button>
+                                                <button onclick="castVote('${g.id}', '${m.id}', 'no')" class="flex-1 py-2 rounded-lg text-[11px] font-black transition-all ${m.no.includes(user.id) ? 'bg-red-500 text-white' : 'bg-white border border-slate-200 text-slate-700 hover:border-red-200'}">NO (${m.no.length})</button>
+                                            </div>
+                                            <div class="w-full bg-slate-200 h-1 rounded-full overflow-hidden">
+                                                <div class="bg-indigo-600 h-full transition-all duration-500" style="width: ${pct}%"></div>
                                             </div>
                                         </div>
                                     `;
-                                }).join('')}
-                            </div>
-                            <div class="p-3 bg-slate-50 flex gap-2">
-                                <input type="text" id="chat-input" placeholder="Message..." class="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none">
-                                <button onclick="sendChat('${g.id}')" class="w-8 h-8 rosa-gradient text-white rounded-lg flex items-center justify-center"><i class="fas fa-paper-plane text-[10px]"></i></button>
-                            </div>
+                                }
+                                if (m.type === 'sys') {
+                                    return `
+                                        <div class="text-center">
+                                            <span class="bg-slate-100 text-slate-800 px-4 py-2 rounded-full text-[11px] font-black uppercase tracking-wider">${m.text}</span>
+                                        </div>
+                                    `;
+                                }
+                                const isMe = (m.sender || "").includes('Ama');
+                                return `
+                                    <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'}">
+                                        <div class="p-3 rounded-xl text-sm font-semibold ${isMe ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-800'}">
+                                            ${m.text}
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
                         </div>
-
-                        <div class="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-3">
-                            <button onclick="makePayment('${g.id}')" class="w-full py-4 bg-emerald-500 text-white rounded-xl font-black text-xs hover:bg-emerald-600 transition-all">Make Payment ($${g.amount})</button>
-                            <button onclick="escalateIssue('${g.id}')" class="w-full py-4 bg-red-50 text-red-500 border border-red-100 rounded-xl font-black text-xs hover:bg-red-100 transition-all">Escalate Dispute to Rosa</button>
+                        <div class="p-3 bg-slate-50 flex gap-2">
+                            <input type="text" id="chat-input" placeholder="Message..." class="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-semibold outline-none text-slate-900 placeholder:text-slate-500">
+                            <button onclick="sendChat('${g.id}')" class="w-10 h-10 rosa-gradient text-white rounded-lg flex items-center justify-center"><i class="fas fa-paper-plane text-[12px]"></i></button>
                         </div>
                     </div>
-                </div>
-            `;
-            showView('detail');
-            setTimeout(() => {
-                const box = document.getElementById('chat-box');
-                if(box) box.scrollTop = box.scrollHeight;
-            }, 100);
-        }
 
-        // --- HELPERS (NO RE-RENDER) ---
-        function chatScrollToBottom() {
+                    <div class="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-3">
+                        <button onclick="shareGroup('${g.id}')" class="w-full py-4 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-xl font-black text-sm hover:bg-indigo-100 transition-all">
+                            Share Join Link via WhatsApp
+                        </button>
+
+                        <button onclick="${payBtnOnclick}" class="${payBtnClass}">${payBtnText}</button>
+
+                        ${
+                            (!alreadySettled && (g.phase === 'reserve' || g.phase === 'cycle'))
+                                ? `<div class="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+                                        <p class="text-[11px] font-black text-amber-800 uppercase tracking-widest mb-1">Status</p>
+                                        <p class="text-sm font-black text-amber-950">You are yet to pay for this period.</p>
+                                   </div>`
+                                : ``
+                        }
+
+                        ${alreadySettled && nextDueText ? `
+                            <div class="bg-slate-50 border border-slate-100 rounded-xl px-4 py-3">
+                                <p class="text-[11px] font-black text-slate-700 uppercase tracking-widest mb-1">Next payment due</p>
+                                <p class="text-sm font-black text-slate-900">${nextDueText}</p>
+                            </div>
+                        ` : ''}
+
+                        <button onclick="escalateIssue('${g.id}')" class="w-full py-4 bg-red-50 text-red-700 border border-red-100 rounded-xl font-black text-sm hover:bg-red-100 transition-all">
+                            Escalate Dispute to Rosa
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        showView('detail');
+        setTimeout(() => {
             const box = document.getElementById('chat-box');
             if (box) box.scrollTop = box.scrollHeight;
-        }
+        }, 100);
+    }
 
-        function appendSystemMessage(gid, text) {
-            const g = groups.find(x => x.id === gid);
-            const msg = { id: 'sys-' + Date.now(), sender: 'System', text, type: 'sys' };
-            g.chat.push(msg);
+    // --- STATUS RESOLUTION ---
+    function resolveMemberStatus(g, memberId) {
+        const key = currentPeriodKey(g);
 
-            const box = document.getElementById('chat-box');
-            if (!box) return;
+        if (g.phase === 'recruiting') return 'pending';
+        if (g.phase === 'completed') return 'paid';
 
-            const wrapper = document.createElement('div');
-            wrapper.id = `chat-item-${msg.id}`;
-            wrapper.className = "text-center";
-            wrapper.innerHTML = `<span class="bg-slate-50 text-slate-400 px-3 py-1 rounded-full text-[8px] font-black uppercase">${text}</span>`;
-            box.appendChild(wrapper);
-            chatScrollToBottom();
-        }
+        const direct = g.contributions?.[`${memberId}-${key}`];
+        if (direct === 'paid') return 'paid';
+        if (direct === 'covered') return 'covered';
 
-        function appendUserMessage(gid, sender, text) {
-            const g = groups.find(x => x.id === gid);
-            const msg = { id: 'msg-' + Date.now(), sender, text, type: 'msg' };
-            g.chat.push(msg);
+        if (g.phase === 'reserve') return 'pending';
 
-            const box = document.getElementById('chat-box');
-            if (!box) return;
+        const member = (g.members || []).find(m => m.id === memberId);
+        const likelyMissed = member && member.trust < 60;
 
-            const isMe = sender.includes('Ama');
-            const wrapper = document.createElement('div');
-            wrapper.id = `chat-item-${msg.id}`;
-            wrapper.className = `flex flex-col ${isMe ? 'items-end' : 'items-start'}`;
-            wrapper.innerHTML = `
-                <div class="p-3 rounded-xl text-[11px] font-medium ${isMe ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-600'}">
-                    ${text}
-                </div>
-            `;
-            box.appendChild(wrapper);
-            chatScrollToBottom();
-        }
-
-        function appendVoteCard(gid, voteObj) {
-            const box = document.getElementById('chat-box');
-            if (!box) return;
-
-            const totalVotes = voteObj.yes.length + voteObj.no.length;
-            const pct = Math.min(100, (totalVotes / voteObj.total) * 100);
-
-            const wrapper = document.createElement('div');
-            wrapper.id = `chat-item-${voteObj.id}`;
-            wrapper.className = "bg-slate-50 border border-slate-100 p-4 rounded-2xl animate-slide-up";
-            wrapper.innerHTML = `
-                <div class="flex justify-between items-start mb-2">
-                    <p class="text-[10px] font-black text-slate-400 uppercase">Community Vote</p>
-                    <i class="fas fa-poll text-indigo-300"></i>
-                </div>
-                <p class="text-xs font-bold mb-3 leading-relaxed">${voteObj.topic}</p>
-                <div class="flex gap-2 mb-3">
-                    <button id="vote-yes-btn-${voteObj.id}" onclick="castVote('${gid}', '${voteObj.id}', 'yes')" class="flex-1 py-2 rounded-lg text-[10px] font-black transition-all bg-white border border-slate-200 text-slate-400 hover:border-emerald-200">YES (<span id="vote-yes-count-${voteObj.id}">${voteObj.yes.length}</span>)</button>
-                    <button id="vote-no-btn-${voteObj.id}" onclick="castVote('${gid}', '${voteObj.id}', 'no')" class="flex-1 py-2 rounded-lg text-[10px] font-black transition-all bg-white border border-slate-200 text-slate-400 hover:border-red-200">NO (<span id="vote-no-count-${voteObj.id}">${voteObj.no.length}</span>)</button>
-                </div>
-                <div class="w-full bg-slate-200 h-1 rounded-full overflow-hidden">
-                    <div id="vote-progress-${voteObj.id}" class="bg-indigo-500 h-full transition-all duration-500" style="width:${pct}%"></div>
-                </div>
-            `;
-            box.appendChild(wrapper);
-            chatScrollToBottom();
-        }
-
-        function updateVoteUI(vid, yesCount, noCount, total, picked) {
-            const yesEl = document.getElementById(`vote-yes-count-${vid}`);
-            const noEl = document.getElementById(`vote-no-count-${vid}`);
-            const prog = document.getElementById(`vote-progress-${vid}`);
-            const yesBtn = document.getElementById(`vote-yes-btn-${vid}`);
-            const noBtn = document.getElementById(`vote-no-btn-${vid}`);
-
-            if (yesEl) yesEl.textContent = yesCount;
-            if (noEl) noEl.textContent = noCount;
-
-            const pct = Math.min(100, ((yesCount + noCount) / total) * 100);
-            if (prog) prog.style.width = `${pct}%`;
-
-            if (yesBtn) yesBtn.className = `flex-1 py-2 rounded-lg text-[10px] font-black transition-all ${picked === 'yes' ? 'bg-emerald-500 text-white' : 'bg-white border border-slate-200 text-slate-400 hover:border-emerald-200'}`;
-            if (noBtn) noBtn.className = `flex-1 py-2 rounded-lg text-[10px] font-black transition-all ${picked === 'no' ? 'bg-red-500 text-white' : 'bg-white border border-slate-200 text-slate-400 hover:border-red-200'}`;
-        }
-
-        function setLedgerStatus(memberId, status) {
-            const pill = document.getElementById(`ledger-status-${memberId}`);
-            if (!pill) return;
-            pill.textContent = status;
-            pill.className = `status-pill status-${status}`;
-        }
-
-        function removeJoinRequestCard(rid) {
-            const el = document.getElementById(`req-${rid}`);
-            if (el) el.remove();
-        }
-
-        // --- VOTING MODAL LOGIC ---
-        function openVoteModal(gid) {
-            currentGroupId = gid;
-            document.getElementById('vote-modal').classList.replace('hidden', 'flex');
-            document.getElementById('vote-topic-input').focus();
-        }
-
-        function closeVoteModal() {
-            document.getElementById('vote-modal').classList.replace('flex', 'hidden');
-            document.getElementById('vote-topic-input').value = '';
-        }
-
-        function submitVoteProposal() {
-            const topic = document.getElementById('vote-topic-input').value.trim();
-            if (!topic) return toast("Please enter a topic to vote on.");
-
-            const g = groups.find(x => x.id === currentGroupId);
-            const voteObj = {
-                id: 'v-' + Date.now(),
-                type: 'vote',
-                topic: topic,
-                yes: [],
-                no: [],
-                total: g.members.length
-            };
-            g.chat.push(voteObj);
-
-            closeVoteModal();
-            appendVoteCard(currentGroupId, voteObj);
-            toast("Vote proposed to the circle.");
-        }
-
-        function castVote(gid, vid, option) {
-            const g = groups.find(x => x.id === gid);
-            const v = g.chat.find(m => m.id === vid);
-            if (!v) return;
-
-            v.yes = v.yes.filter(id => id !== user.id);
-            v.no  = v.no.filter(id => id !== user.id);
-
-            v[option].push(user.id);
-
-            updateVoteUI(vid, v.yes.length, v.no.length, v.total, option);
-            toast(`Vote cast: ${option.toUpperCase()}`);
-        }
-
-        // --- LEADER ACTIONS ---
-        function handleRequest(gid, rid, approved) {
-            const g = groups.find(x => x.id === gid);
-            const reqIdx = g.requests.findIndex(r => r.id === rid);
-            const req = g.requests[reqIdx];
-            if (!req) return;
-
-            if (approved) {
-                g.members.push({ ...req, role: 'Member' });
-                g.payoutOrder.push(req.id);
-                appendSystemMessage(gid, `${req.name} has joined the circle.`);
-                toast(`${req.name} added to group!`);
-            } else {
-                toast(`Request from ${req.name} declined.`);
+        if (likelyMissed) {
+            const dep = g.deposit?.[memberId];
+            if (dep && dep.available && !dep.used) {
+                g.deposit[memberId].used = true;
+                g.contributions[`${memberId}-${key}`] = 'covered';
+                appendSystemMessage(g.id, `${member.name}'s deposit covered a missed payment (one-time use).`);
+                return 'covered';
             }
 
-            g.requests.splice(reqIdx, 1);
-            removeJoinRequestCard(req.id);
+            g.trustEvents = g.trustEvents || {};
+            const eventKey = `${memberId}-${key}-missed`;
+            if (!g.trustEvents[eventKey]) {
+                g.trustEvents[eventKey] = true;
+                applyTrustDelta(g, memberId, -10);
+            }
+
+            return 'missed';
         }
 
-        // --- ACTIONS ---
-        function requestJoin(gid) {
-            const g = groups.find(x => x.id === gid);
-            toast(`Join request sent to ${g.name}. Waiting for leader approval.`);
-        }
+        return 'pending';
+    }
 
-        function makePayment(gid) {
-            const g = groups.find(x => x.id === gid);
-            const monthKey = g.status.includes('5/6') ? 'm5' : 'm1';
+    function setLedgerStatus(memberId, status) {
+        const pill = document.getElementById(`ledger-status-${memberId}`);
+        if (!pill) return;
+        pill.textContent = status;
+        pill.className = `status-pill status-${status}`;
+    }
 
-            g.contributions[`${user.id}-${monthKey}`] = 'paid';
-            setLedgerStatus(user.id, 'paid');
-            appendSystemMessage(gid, `Ama paid her contribution.`);
+    // --- CHAT HELPERS ---
+    function chatScrollToBottom() {
+        const box = document.getElementById('chat-box');
+        if (box) box.scrollTop = box.scrollHeight;
+    }
 
-            user.trust = Math.min(100, user.trust + 1);
-            updateTrust();
-            toast("Payment successful! Trust Score +1");
-        }
+    function appendSystemMessage(gid, text) {
+        const g = groups.find(x => x.id === gid);
+        if (!g) return;
 
-        function escalateIssue(gid) {
-            appendSystemMessage(gid, `${user.name} reported a dispute. Admin notified.`);
-            toast("Escalated to Rosa Support.");
-        }
+        g.chat = g.chat || [];
+        const msg = { id: 'sys-' + Date.now(), sender: 'System', text, type: 'sys' };
+        g.chat.push(msg);
 
-        function sendChat(gid) {
-            const inp = document.getElementById('chat-input');
-            const text = inp.value.trim();
-            if (!text) return;
+        const box = document.getElementById('chat-box');
+        if (!box) return;
 
-            inp.value = '';
-            appendUserMessage(gid, user.name, text);
-        }
+        const wrapper = document.createElement('div');
+        wrapper.className = "text-center";
+        wrapper.innerHTML = `<span class="bg-slate-100 text-slate-800 px-4 py-2 rounded-full text-[11px] font-black uppercase tracking-wider">${text}</span>`;
+        box.appendChild(wrapper);
+        chatScrollToBottom();
+    }
 
-        function updateTrust() {
-            document.getElementById('global-trust').innerText = user.trust;
-        }
+    function appendUserMessage(gid, sender, text) {
+        const g = groups.find(x => x.id === gid);
+        if (!g) return;
 
-        function toast(msg) {
-            const t = document.createElement('div');
-            t.className = "bg-slate-900 text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 animate-slide-up z-[120]";
-            t.innerHTML = `<i class="fas fa-check-circle text-indigo-400"></i> <span class="text-xs font-bold">${msg}</span>`;
-            document.getElementById('toast-container').appendChild(t);
-            setTimeout(() => t.remove(), 3000);
-        }
+        g.chat = g.chat || [];
+        const msg = { id: 'msg-' + Date.now(), sender, text, type: 'msg' };
+        g.chat.push(msg);
 
-        // --- FORM LOGIC ---
-        const gAmt = document.getElementById('g-amount');
-        const gCnt = document.getElementById('g-count');
-        const updatePot = () => {
-            document.getElementById('pot-calc').innerText = `$${((gAmt.value || 0) * (gCnt.value || 0)).toLocaleString()} / Month Pot`;
+        const box = document.getElementById('chat-box');
+        if (!box) return;
+
+        const isMe = (sender || "").includes('Ama');
+        const wrapper = document.createElement('div');
+        wrapper.className = `flex flex-col ${isMe ? 'items-end' : 'items-start'}`;
+        wrapper.innerHTML = `
+            <div class="p-3 rounded-xl text-sm font-semibold ${isMe ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-800'}">
+                ${text}
+            </div>
+        `;
+        box.appendChild(wrapper);
+        chatScrollToBottom();
+    }
+
+    // --- VOTING ---
+    function openVoteModal(gid) {
+        currentGroupId = gid;
+        document.getElementById('vote-modal').classList.replace('hidden', 'flex');
+        document.getElementById('vote-topic-input').focus();
+    }
+    function closeVoteModal() {
+        document.getElementById('vote-modal').classList.replace('flex', 'hidden');
+        document.getElementById('vote-topic-input').value = '';
+    }
+    function submitVoteProposal() {
+        const topic = document.getElementById('vote-topic-input').value.trim();
+        if (!topic) return toast("Please enter a topic to vote on.");
+
+        const g = groups.find(x => x.id === currentGroupId);
+        if (!g) return;
+
+        const voteObj = {
+            id: 'v-' + Date.now(),
+            type: 'vote',
+            topic: topic,
+            yes: [],
+            no: [],
+            total: (g.members || []).length
         };
-        gAmt.addEventListener('input', updatePot);
-        gCnt.addEventListener('input', updatePot);
+        g.chat.push(voteObj);
 
-        document.getElementById('create-group-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const id = 'g-' + Date.now();
-            const newG = {
-                id, name: document.getElementById('g-name').value,
-                amount: parseInt(gAmt.value), max: parseInt(gCnt.value),
-                leaderId: user.id, status: 'Ama is Leader', joined: true,
-                payoutOrder: [user.id],
-                members: [{ ...user, role: 'Leader' }],
-                contributions: {}, chat: [{ id: 'sys-' + Date.now(), sender: 'System', text: 'New custom circle created.', type: 'sys' }],
-                votes: [], requests: []
-            };
-            groups.unshift(newG);
-            toggleTabs('joined');
-            openGroup(id);
-            toast("Circle Live!");
+        closeVoteModal();
+        openGroup(currentGroupId);
+        toast("Vote proposed to the circle.");
+    }
+    function castVote(gid, vid, option) {
+        const g = groups.find(x => x.id === gid);
+        if (!g) return;
+        const v = (g.chat || []).find(m => m.id === vid);
+        if (!v) return;
+
+        v.yes = v.yes.filter(id => id !== user.id);
+        v.no  = v.no.filter(id => id !== user.id);
+        v[option].push(user.id);
+
+        openGroup(gid);
+        toast(`Vote cast: ${option.toUpperCase()}`);
+    }
+
+    // ✅ LEADER ACTIONS (REAL actions)
+    function openLeaderActionModal(gid) {
+        currentGroupId = gid;
+        const g = groups.find(x => x.id === gid);
+        if (!g) return;
+
+        const isLeader = (g.leaderId === user.id);
+        if (!isLeader) return toast("Only leader can do this.");
+
+        const sel = document.getElementById('leader-member-select');
+        sel.innerHTML = (g.members || [])
+            .filter(m => m.id !== g.leaderId)
+            .map(m => `<option value="${m.id}">${m.name} (Trust ${m.trust}${m.paused ? " • PAUSED" : ""})</option>`)
+            .join('');
+
+        document.getElementById('leader-action-modal').classList.replace('hidden', 'flex');
+    }
+
+    function closeLeaderActionModal() {
+        document.getElementById('leader-action-modal').classList.replace('flex', 'hidden');
+    }
+
+    function leaderPauseMember() {
+        const g = groups.find(x => x.id === currentGroupId);
+        if (!g) return;
+
+        const memberId = document.getElementById('leader-member-select').value;
+        const member = g.members.find(m => m.id === memberId);
+        if (!member) return;
+
+        const ok = confirm(`Pause ${member.name}? They won’t receive payouts until resumed.`);
+        if (!ok) return;
+
+        member.paused = true;
+        appendSystemMessage(g.id, `Leader paused ${member.name}. Payout access suspended until resolved.`);
+        applyTrustDelta(g, memberId, -2);
+
+        toast("Member paused.");
+        openGroup(g.id);
+    }
+
+    function leaderRemoveMember() {
+        const g = groups.find(x => x.id === currentGroupId);
+        if (!g) return;
+
+        const memberId = document.getElementById('leader-member-select').value;
+        const member = g.members.find(m => m.id === memberId);
+        if (!member) return;
+
+        const ok = confirm(`Remove ${member.name}? This action kicks them out permanently.`);
+        if (!ok) return;
+
+        // remove from members
+        g.members = g.members.filter(m => m.id !== memberId);
+
+        // remove from payoutOrder (replace with null slot)
+        ensurePayoutOrder(g);
+        g.payoutOrder = g.payoutOrder.map(uid => uid === memberId ? null : uid);
+
+        // also remove their requests if any
+        g.requests = (g.requests || []).filter(r => r.userId !== memberId);
+
+        appendSystemMessage(g.id, `Leader removed ${member.name} from the circle.`);
+        toast("Member removed.");
+
+        openGroup(g.id);
+        renderGroups();
+    }
+
+    function leaderContactSupport() {
+        const g = groups.find(x => x.id === currentGroupId);
+        if (!g) return;
+
+        const memberId = document.getElementById('leader-member-select').value;
+        const member = g.members.find(m => m.id === memberId);
+        if (!member) return;
+
+        const ok = confirm(`Contact Rosa Customer Service about ${member.name}?`);
+        if (!ok) return;
+
+        appendSystemMessage(g.id, `Leader opened a customer service case for ${member.name}. Rosa support notified.`);
+        toast("Customer service notified.");
+        applyTrustDelta(g, memberId, -1);
+
+        openGroup(g.id);
+    }
+
+    // --- COPY / SHARE ---
+    function copyText(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => toast("Copied.")).catch(() => fallbackCopy(text));
+        } else {
+            fallbackCopy(text);
+        }
+    }
+    function fallbackCopy(text) {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+            document.execCommand("copy");
+            toast("Copied.");
+        } catch (e) {
+            toast("Copy failed. Please copy manually.");
+        }
+        ta.remove();
+    }
+    function copyInviteCode(code) {
+        copyText(code);
+    }
+
+    function shareGroup(gid) {
+        const g = groups.find(x => x.id === gid);
+        if (!g) return;
+
+        const inviteCode = inviteCodeFromGroupId(gid);
+        const joinLink = `https://rosa.app/join?code=${encodeURIComponent(inviteCode)}`;
+        const msg =
+`Rosa Join Link: ${joinLink}
+Invite Code: ${inviteCode}
+Circle: ${g.name}
+Contribution: ${fmt(g.amount)} / ${g.frequency}
+Note: Request to join (leader approves). Circle starts only when full.`;
+
+        const waUrl = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+        window.open(waUrl, '_blank');
+        toast("WhatsApp share opened.");
+    }
+
+    // ✅ PAYMENTS (with Paystack loader fix)
+    async function makePayment(gid) {
+        const g = groups.find(x => x.id === gid);
+        if (!g) return;
+
+        if (!isStarted(g) || (g.phase !== 'reserve' && g.phase !== 'cycle')) {
+            toast("Payments open after the circle starts (when full).");
+            return;
+        }
+
+        const key = currentPeriodKey(g);
+        const current = g.contributions?.[`${user.id}-${key}`];
+        if (current === 'paid' || current === 'covered') {
+            toast("You already settled for this period.");
+            return;
+        }
+
+        try {
+            await loadPaystackScript();
+        } catch (err) {
+            console.error(err);
+            toast("Paystack blocked. Use Live Server + disable Adblock.");
+            appendSystemMessage(gid, "Paystack could not load. Tip: run on http://localhost using Live Server and disable adblock.");
+            return;
+        }
+
+        if (typeof PaystackPop === "undefined") {
+            toast("Paystack still not available (blocked).");
+            return;
+        }
+
+        const handler = PaystackPop.setup({
+            key: PAYSTACK_PUBLIC_KEY,
+            email: "ama.demo@rosa.app",
+            amount: Math.max(1, parseInt(g.amount || 0) * 100),
+            currency: "GHS",
+            ref: "ROSA-DEMO-" + Date.now(),
+            callback: function (response) {
+                const ts = new Date().toLocaleString();
+
+                g.contributions = g.contributions || {};
+                g.contributions[`${user.id}-${key}`] = 'paid';
+                setLedgerStatus(user.id, 'paid');
+
+                if (g.phase === 'reserve') {
+                    g.deposit = g.deposit || {};
+                    g.deposit[user.id] = { available: true, used: false };
+                }
+
+                appendSystemMessage(gid, `Payment confirmed (${fmt(g.amount)}) • ${ts} • Ref: ${response.reference}`);
+                applyTrustDelta(g, user.id, +1);
+
+                g.nextDue = g.nextDue || {};
+                g.nextDue[user.id] = computeNextDueDate(g.frequency);
+                appendSystemMessage(gid, `Next payment due: ${g.nextDue[user.id]}`);
+
+                toast("Payment successful.");
+                maybeAdvancePhase(g);
+                openGroup(gid);
+            },
+            onClose: function () {
+                toast("Payment cancelled.");
+            }
         });
 
-        // Init
-        renderGroups();
-    </script>
+        handler.openIframe();
+    }
+
+    function escalateIssue(gid) {
+        const ok = window.confirm("Are you sure you want to escalate this dispute to Rosa support?");
+        if (!ok) return;
+
+        const g = groups.find(x => x.id === gid);
+        if (g) applyTrustDelta(g, user.id, -3);
+
+        appendSystemMessage(gid, `${user.name} reported a dispute. Admin notified.`);
+        toast("Escalated to Rosa Support.");
+    }
+
+    function sendChat(gid) {
+        const inp = document.getElementById('chat-input');
+        const text = (inp.value || "").trim();
+        if (!text) return;
+
+        inp.value = '';
+        appendUserMessage(gid, user.name, text);
+    }
+
+    function updateTrust() {
+        document.getElementById('global-trust').innerText = user.trust;
+    }
+
+    function toast(msg) {
+        const t = document.createElement('div');
+        t.className = "bg-slate-900 text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 animate-slide-up z-[220]";
+        t.innerHTML = `<i class="fas fa-check-circle text-indigo-300"></i> <span class="text-sm font-black tracking-wide">${msg}</span>`;
+        document.getElementById('toast-container').appendChild(t);
+        setTimeout(() => t.remove(), 3000);
+    }
+
+    // --- FORM LOGIC ---
+    const gAmt = document.getElementById('g-amount');
+    const gCnt = document.getElementById('g-count');
+    const gFreq = document.getElementById('g-frequency');
+
+    const updatePot = () => {
+        const pot = ((gAmt.value || 0) * (gCnt.value || 0));
+        const freq = (gFreq.value || "Monthly");
+        document.getElementById('pot-calc').innerText = `GH¢${Number(pot).toLocaleString()} / ${freq} Pot`;
+    };
+
+    gAmt.addEventListener('input', updatePot);
+    gCnt.addEventListener('input', updatePot);
+    gFreq.addEventListener('change', updatePot);
+
+    document.getElementById('create-group-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const id = 'g-' + Date.now();
+
+        const amount = parseInt(gAmt.value);
+        const max = parseInt(gCnt.value);
+        const frequency = gFreq.value;
+
+        const payoutOrder = Array(max).fill(null);
+        payoutOrder[0] = user.id;
+
+        const newG = {
+            id,
+            name: document.getElementById('g-name').value,
+            amount,
+            max,
+            frequency,
+            leaderId: user.id,
+            started: false,
+            phase: 'recruiting',
+            cycleMonth: 0,
+            status: 'Recruiting',
+            joined: true,
+            payoutOrder,
+            payoutPaidOut: {},
+            members: [{ id: user.id, name: user.name, trust: user.trust, role: 'Leader', paused: false }],
+            deposit: {},
+            contributions: {},
+            trustEvents: {},
+            nextDue: {},
+            chat: [{ id: 'sys-' + Date.now(), sender: 'System', text: 'New circle created. Recruiting until full. Request-to-join is enabled.', type: 'sys' }],
+            votes: [],
+            requests: []
+        };
+
+        groups.unshift(newG);
+        toggleTabs('joined');
+        openGroup(id);
+        toast("Circle live. Recruiting started.");
+    });
+
+    // Init
+    updateTrust();
+    renderGroups();
+</script>
 </body>
 </html>
