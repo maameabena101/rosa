@@ -1,5 +1,5 @@
+## Project Brief 
 # Rosa — Trust-First Digital Rotating Savings
-
 ## Overview
 Rosa is a trust-first digital platform that formalizes rotating savings groups (ROSCA / susu) by replacing informal coordination with transparency, governance, and accountability.
 
