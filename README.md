@@ -23,15 +23,14 @@ Rosa digitizes group savings while preserving social trust through transparent c
 **Data:** In-memory / localStorage  
 **Payments:** Simulated Paystack integration
 
-\[
-\text{Total Monthly Pot} = \text{Contribution Amount} \times \text{Number of Members}
-\]
+Total Monthly Pot = Contribution Amount × Number of Members
+
 
 ## Impact
 Rosa reduces coordination friction, increases transparency, and enables scalable group savings without replacing the social trust that makes these groups work.
 
 ## Tech Stack
-HTML • CSS • JavaScript • Paystack (demo)
+HTML • CSS • JavaScript • Paystack API
 
 ## Future Work
 - Backend services
